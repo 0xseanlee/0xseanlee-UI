@@ -1,4 +1,4 @@
--- 0xseanlee UI UI v0.3.0 | Standalone, independently implemented Roblox UI.
+-- 0xseanlee UI v0.3.1 | Standalone, independently implemented Roblox UI.
 -- No remote assets, network requests, or telemetry.
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -264,7 +264,7 @@ function Library:CreateWindow(options)
     local function call(fn,value)
         if type(fn)~="function" or window._destroyed then return end
         local ok,err=pcall(fn,value)
-        if not ok then warn("[0xseanlee UI UI] "..tostring(err)); window:Notify({Title="Callback error",Content="See the console for details."}) end
+        if not ok then warn("[0xseanlee UI] "..tostring(err)); window:Notify({Title="Callback error",Content="See the console for details."}) end
     end
     -- Navigation stays independent of the scrollable page.
     local rail=new("Frame",{Name="Navigation",Position=UDim2.fromOffset(0,STYLE.Header),Size=UDim2.new(0,STYLE.Sidebar,1,-STYLE.Header),BackgroundColor3=C.Sidebar,BackgroundTransparency=0.35,BorderSizePixel=0},root)
@@ -300,7 +300,7 @@ function Library:CreateWindow(options)
             if window._query=="" then for _,section in ipairs(tab._sections) do section.Frame.Visible=section._visible end end
             if tab==window.SelectedTab then
                 pageCount.Text=tostring(count)..(count==1 and " control" or " controls")
-                empty.Visible=count==0
+                empty.Visible=count==0 and window._query~=""
             end
         end
         local focused=UIS:GetFocusedTextBox()

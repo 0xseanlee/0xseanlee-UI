@@ -2,9 +2,9 @@
 
 Roblox Lua UI 函式庫，提供深色面板、藍紫色強調色、分頁、開關、滑桿、下拉選單、輸入框和快捷鍵。透過設定表建立元件，使用自己的 Callback 接上功能。
 
-目前版本：**v0.3.0**。介面與事件處理由本函式庫實作；沒有內建遊戲自動化功能、遙測或第三方 Logo。
+目前版本：**v0.3.1**。本版已移除預設展示分頁與範例元件，文件中的元件範例可依需要自行加入。介面與事件處理由本函式庫實作；沒有內建遊戲自動化功能、遙測或第三方 Logo。
 
-## 1. 最快測試完整 UI
+## 1. 載入空白 UI
 
 在支援 `game:HttpGet` 和 `loadstring` 的 Lua 執行環境中執行：
 
@@ -12,7 +12,7 @@ Roblox Lua UI 函式庫，提供深色面板、藍紫色強調色、分頁、開
 loadstring(game:HttpGet("https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/main/Demo.client.lua"))()
 ```
 
-這會打開包含 Main、Components、Overview 和 Settings 的完整展示介面。也可以直接複製 [Demo.client.lua](Demo.client.lua) 全部內容執行；單檔已包含函式庫，這種方式不需要遠端載入。
+這只會打開標題為 0xseanlee UI 的視窗和空白 Main 分頁，不會自動建立展示按鈕、開關或其他範例元件。也可以直接複製 [Demo.client.lua](Demo.client.lua) 全部內容執行；單檔已包含函式庫，這種方式不需要遠端載入。
 
 操作：
 
@@ -56,11 +56,11 @@ Main:CreateButton({
 
 `Library.lua` 回傳函式庫 table；`CreateWindow` 回傳視窗，`CreateTab` 回傳分頁，各個 `Create...` 方法回傳可更新的元件物件。
 
-若要固定在目前版本、不跟隨 main 的更新，將網址中的 `/main/` 改成 `/v0.3.0/`：
+若要固定在目前版本、不跟隨 main 的更新，將網址中的 `/main/` 改成 `/v0.3.1/`：
 
 ```lua
 local UI = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/v0.3.0/Library.lua"
+    "https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/v0.3.1/Library.lua"
 ))()
 ```
 
@@ -237,8 +237,8 @@ end})
 | 檔案 | 說明 |
 | --- | --- |
 | [Library.lua](Library.lua) | 可重用的 UI 函式庫 |
-| [Demo.client.lua](Demo.client.lua) | 包含函式庫的完整展示，直接執行此檔 |
-| [Example.lua](Example.lua) | 展示內容原始碼，由 build.py 包入 Library 變數後使用 |
+| [Demo.client.lua](Demo.client.lua) | 包含函式庫的空白起始介面，直接執行此檔 |
+| [Example.lua](Example.lua) | 空白起始介面原始碼，由 build.py 包入 Library 變數後使用 |
 | [build.py](build.py) | 使用 Python 3 產生單檔展示 |
 | [test.lua](test.lua) | 模擬 Roblox API 的 Lua 測試 |
 | [STYLE.md](STYLE.md) | 尺寸、色彩與字體規格 |
@@ -260,4 +260,4 @@ lua test.lua
 - **Callback 報錯**：Console 會印出錯誤，並顯示簡短通知。
 - **無法選取多個項目或找不到色彩選擇器**：目前尚未提供多選、色彩選擇器及設定檔儲存。
 
-已通過 Lua 語法、元件狀態、Callback、搜尋、焦點、快捷鍵、滑鼠／觸控事件路由及清理的模擬測試。**v0.3.0 尚未在 Roblox／MacSploit 實測**；模擬測試不代表實際字型、排版或所有執行環境都已驗證。
+已通過 Lua 語法、元件狀態、Callback、搜尋、焦點、快捷鍵、滑鼠／觸控事件路由及清理的模擬測試。**v0.3.1 尚未在 Roblox／MacSploit 實測**；模擬測試不代表實際字型、排版或所有執行環境都已驗證。

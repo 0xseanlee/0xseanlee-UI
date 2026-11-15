@@ -357,6 +357,10 @@ check(input.InputBegan:Count() == 0 and input.InputChanged:Count() == 0 and inpu
 check(input.WindowFocusReleased:Count() == 0, "Window focus router cleanup")
 -- Run the generated standalone demo against the same API double.
 assert(loadfile(testDirectory .. "/Demo.client.lua"))()
-check(_G.__VELVET_UI_WINDOW ~= nil, "Demo mounts")
+check(_G.__VELVET_UI_WINDOW ~= nil, "Starter mounts")
+check(#_G.__VELVET_UI_WINDOW.Tabs == 1, "Starter has only Main")
+check(_G.__VELVET_UI_WINDOW.Tabs[1].Name == "Main", "Starter Main tab")
+check(#_G.__VELVET_UI_WINDOW._controls == 0, "Starter has no example controls")
+check(not _G.__VELVET_UI_WINDOW.Root:FindFirstChild("Content"):FindFirstChildOfClass("TextLabel").Visible, "Blank page has no search placeholder")
 _G.__VELVET_UI_WINDOW:Destroy()
 print("PASS: state, callbacks, tabs, numeric validation, refresh cleanup, hidden/focused input, control states, search, exclusive capture, re-run cleanup, standalone demo")
