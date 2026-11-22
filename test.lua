@@ -364,4 +364,43 @@ replacement:Destroy()
 local nativeAgain = Library:MakeWindow({Title = "Native again"})
 check(nativeAgain:MakeTab({"Again", "home"}))
 nativeAgain.Root.Parent:Destroy()
-print("PASS: settings, theme, drag, both APIs, callbacks, dropdown refresh, keybind, remount")
+
+-- A new execution gets new library state and GUI, while the local player stays.
+local jsonWrites, storedFile = {}, {}
+function services.HttpService:JSONEncode(value)
+    jsonWrites[#jsonWrites + 1] = value
+    return tostring(#jsonWrites)
+end
+function services.HttpService:JSONDecode(value)
+    return assert(jsonWrites[tonumber(value)], "Invalid preferences")
+end
+function writefile(name, value) storedFile[name] = value end
+function readfile(name) return assert(storedFile[name]) end
+nativeGui = Library:MakeWindow({Title = "Choose preferences"}).Root.Parent
+selectSetting("Large")
+selectSetting("Red")
+local rememberedScale = nativeGui.Scale.Scale
+local reloaded = assert(load(source, "@Library.lua"))()
+local reopened = reloaded:CreateWindow({Scale = 0.5, AccentColor = Color3.fromRGB(0, 255, 0)})
+check(reopened.Gui ~= nativeGui and reopened.Gui.Scale.Scale == rememberedScale, "Reload restores size")
+check(reloaded.Save.Theme == "Red", "Reload restores the chosen theme")
+local shown = {}
+for _, label in ipairs(reopened.Gui:GetDescendants()) do
+    if label:IsA("TextLabel") and label.Parent.Name ~= "Option" then shown[label.Text] = true end
+end
+check(shown.Large and shown.Red, "Dropdowns display the restored preferences")
+reopened:Destroy()
+
+player:SetAttribute("SeanUI_SizePreset", nil)
+player:SetAttribute("SeanUI_ColorTheme", nil)
+local fromDisk = assert(load(source, "@Library.lua"))()
+local restored = fromDisk:CreateWindow({})
+check(restored.Gui.Scale.Scale == rememberedScale and fromDisk.Save.Theme == "Red", "File restores settings without session attributes")
+restored:Destroy()
+
+storedFile["0xseanlee-ui-preferences.json"] = "corrupt"
+local fallback = assert(load(source, "@Library.lua"))()
+local default = fallback:CreateWindow({})
+check(default.Gui.Scale.Scale < rememberedScale and fallback.Save.Theme == "Darker", "Corrupt file falls back to defaults")
+default:Destroy()
+print("PASS: preference reload and file fallback, settings, theme, drag, both APIs, callbacks, dropdown refresh, keybind, remount")

@@ -896,7 +896,39 @@ for name, accent in pairs({
 	redzlib.Themes[name] = palette
 end
 local SIZE_PRESETS = {Small = 0.67, Medium = 0.83, Large = 1}
-local sizePreset = "Medium"
+local preferenceFile = "0xseanlee-ui-preferences.json"
+local sizeAttribute = "SeanUI_SizePreset"
+local themeAttribute = "SeanUI_ColorTheme"
+local function validPreset(value)
+	return type(value) == "string" and SIZE_PRESETS[value] ~= nil
+end
+local function validTheme(value)
+	return value == "Red" or value == "Blue"
+end
+
+local saved = {}
+if type(readfile) == "function" then
+	local ok, data = pcall(function()
+		return HttpService:JSONDecode(readfile(preferenceFile))
+	end)
+	if ok and type(data) == "table" then saved = data end
+end
+
+local preferredSize = Player:GetAttribute(sizeAttribute)
+local preferredTheme = Player:GetAttribute(themeAttribute)
+if not validPreset(preferredSize) then preferredSize = validPreset(saved.Size) and saved.Size or nil end
+if not validTheme(preferredTheme) then preferredTheme = validTheme(saved.Theme) and saved.Theme or nil end
+local sizePreset = preferredSize or "Medium"
+
+local function rememberPreferences()
+	Player:SetAttribute(sizeAttribute, preferredSize)
+	Player:SetAttribute(themeAttribute, preferredTheme)
+	if type(writefile) == "function" then
+		pcall(function()
+			writefile(preferenceFile, HttpService:JSONEncode({Size = preferredSize, Theme = preferredTheme}))
+		end)
+	end
+end
 
 local ViewportSize = workspace.CurrentCamera.ViewportSize
 local UIScale = ViewportSize.Y / 450
@@ -1225,6 +1257,7 @@ local function SaveJson(FileName, save)
 	end
 end
 
+if preferredTheme then redzlib.Save.Theme = preferredTheme end
 local Theme = redzlib.Themes[redzlib.Save.Theme]
 
 local function AddEle(Name, Func)
@@ -2782,17 +2815,22 @@ function redzlib:MakeWindow(Configs)
 	settingsTab._navigation.LayoutOrder = 1000000
 	Window.SettingsTab = settingsTab
 	settingsTab:AddSection("UI Size")
+	local initializingSize = true
 	settingsTab:AddDropdown({
 		Name = "Size",
 		Options = {"Small", "Medium", "Large"},
 		Default = sizePreset,
 		Callback = function(name)
-			if not SIZE_PRESETS[name] or name == sizePreset and presetActive then return end
+			if initializingSize or not validPreset(name) then return end
+			preferredSize = name
+			rememberPreferences()
+			if name == sizePreset and presetActive then return end
 			sizePreset = name
 			Window:_setPresetActive(true)
 			MainFrame.Position = UDim2.new(0.5, -MainFrame.Size.X.Offset / 2, 0.5, -MainFrame.Size.Y.Offset / 2)
 		end,
 	})
+	initializingSize = false
 	settingsTab:AddSection("Color Theme")
 	local currentTheme = redzlib.Save.Theme
 	local initializingTheme = true
@@ -2801,7 +2839,10 @@ function redzlib:MakeWindow(Configs)
 		Options = {"Red", "Blue"},
 		Default = currentTheme == "Red" and "Red" or "Blue",
 		Callback = function(name)
-			if not initializingTheme then redzlib:SetTheme(name, false) end
+			if initializingTheme or not validTheme(name) then return end
+			preferredTheme = name
+			rememberPreferences()
+			redzlib:SetTheme(name, false)
 		end,
 	})
 	initializingTheme = false
@@ -2837,7 +2878,7 @@ function redzlib:CreateWindow(options)
 
 	reducedMotion = options.ReducedMotion == true
 	local previousTheme = Theme
-	if options.AccentColor then
+	if options.AccentColor and not preferredTheme then
 		Theme = {}
 		for key, value in pairs(previousTheme) do Theme[key] = value end
 		Theme["Color Theme"] = options.AccentColor
@@ -2850,7 +2891,7 @@ function redzlib:CreateWindow(options)
 	local connections, controls, bindings = {}, {}, {}
 	local destroyed, query, capture = false, "", nil
 	local requestedScale = options.Scale or 1
-	if options.Scale then native:_setPresetActive(false) end
+	if options.Scale and not preferredSize then native:_setPresetActive(false) end
 
 	local function connect(signal, fn)
 		connections[#connections + 1] = signal:Connect(fn)
