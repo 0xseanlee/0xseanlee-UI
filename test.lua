@@ -258,8 +258,52 @@ end
 local file = assert(io.open(testDirectory .. "/Library.lua"))
 local source = file:read("*a"); file:close()
 source = source:gsub("in self%.Icons do", "in pairs(self.Icons) do")
+local attempts = {}
+local teleport = {TeleportInitFailed = signal()}
+function teleport:Teleport(placeId, playerArg)
+    attempts[#attempts + 1] = {placeId, playerArg}
+end
+function teleport:TeleportToPlaceInstance(placeId, jobId, playerArg)
+    attempts[#attempts + 1] = {placeId, playerArg, jobId}
+end
+services.TeleportService = teleport
+game.PlaceId = 123
+game.JobId = "12345678-1234-1234-1234-123456789abc"
 local Library = assert(load(source, "@Library.lua"))()
+local defaultWindow = assert(Library.DefaultWindow, "Loading without CreateWindow opens the menus")
+check(defaultWindow.SettingsTab.Cont.Parent and defaultWindow.ServerTab, "Settings and Server exist without an app window")
+local defaultRoot = defaultWindow.Root
+local server = defaultWindow.ServerTab
+local jobBox = server.Cont:FindFirstChildOfClass("TextBox")
+if not jobBox then
+    for _, node in ipairs(server.Cont:GetDescendants()) do
+        if node:IsA("TextBox") then jobBox = node; break end
+    end
+end
+local function clickServerButton(name)
+    for _, label in ipairs(server.Cont:GetDescendants()) do
+        if label:IsA("TextLabel") and label.Text == name then
+            label.Parent.Parent.Activated:Fire()
+            return
+        end
+    end
+    error("Missing server button: " .. name)
+end
+jobBox.Text = "bad id"; clickServerButton("Join Server")
+jobBox.Text = game.JobId; clickServerButton("Join Server")
+check(#attempts == 0, "Invalid and current IDs are rejected locally")
+local targetJob = "abcdef12-3456-7890-abcd-001122334455"
+jobBox.Text = " " .. targetJob:upper() .. " "; clickServerButton("Join Server")
+check(#attempts == 1 and attempts[1][1] == game.PlaceId and attempts[1][2] == player and attempts[1][3] == targetJob,
+    "Exact job uses the current place and local player")
+clickServerButton("Server Hop")
+check(#attempts == 1, "A pending teleport blocks repeat requests")
+teleport.TeleportInitFailed:Fire(player, nil, "Server full", game.PlaceId)
+clickServerButton("Server Hop")
+check(#attempts == 2 and attempts[2][3] == nil, "Hop requests matchmaking after a failed job join")
 local current = Library:MakeWindow({Title = "Current API"})
+check(defaultRoot._dead and Library.DefaultWindow == nil, "An explicit window replaces the default one")
+check(teleport.TeleportInitFailed:Count() == 1, "The replaced menu disconnects its teleport listener")
 local currentTab = current:MakeTab({"Current", "home"})
 check(currentTab:AddButton({Name = "Current button"}).Frame, "Native control still works")
 local settings = current:MakeTab({"settings"})
@@ -403,4 +447,4 @@ local fallback = assert(load(source, "@Library.lua"))()
 local default = fallback:CreateWindow({})
 check(default.Gui.Scale.Scale < rememberedScale and fallback.Save.Theme == "Darker", "Corrupt file falls back to defaults")
 default:Destroy()
-print("PASS: preference reload and file fallback, settings, theme, drag, both APIs, callbacks, dropdown refresh, keybind, remount")
+print("PASS: default windows, teleport routing, preference reload and file fallback, settings, theme, drag, both APIs, callbacks, dropdown refresh, keybind, remount")

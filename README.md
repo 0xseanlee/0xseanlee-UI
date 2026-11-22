@@ -17,7 +17,11 @@ Main:CreateToggle({Name = "Example", CurrentValue = false, Callback = print})
 
 每個視窗都會加上 **Settings**。在 **UI Size** 的 **Size** 下拉選單可選 Small、Medium、Large。在 **Color Theme** 的 **Theme** 下拉選單可選 Red 或 Blue。拖曳視窗頂欄可移動視窗，浮動按鈕也能直接拖曳。UI 重新執行時會套用上次選的大小與配色。同一個 Roblox 工作階段用本機屬性記住。有本機檔案讀寫的環境也能跨工作階段保留設定。
 
-將 [Demo.client.lua](Demo.client.lua) 放進 Roblox Studio 的 `StarterPlayerScripts`，以 Play 開啟空白 Main 分頁與固定的 Settings 分頁。左上的浮動 `0x` 可以切換視窗。要自行建立元件，可把 [Library.lua](Library.lua) 放進 `ReplicatedStorage` 的 ModuleScript，例如命名為 `SeanUI`，然後由 LocalScript 呼叫：
+單獨載入函式庫也會顯示 **Settings** 和 **Server**。之後呼叫 `MakeWindow` 或 `CreateWindow` 會用自訂視窗取代這個預設視窗。
+
+**Server** 分頁提供 **Server Hop** 和 **Join Server**。前者請 Roblox 為目前地圖配對，Roblox 可能分到同一台。後者輸入同一地圖的公開伺服器 Job ID，並由 Roblox 驗證是否可加入。遊戲伺服器的存取限制仍適用。
+
+將 [Demo.client.lua](Demo.client.lua) 放進 Roblox Studio 的 `StarterPlayerScripts`，以 Play 開啟空白 Main 分頁，以及固定的 Settings 和 Server 分頁。左上的浮動 `0x` 可以切換視窗。要自行建立元件，可把 [Library.lua](Library.lua) 放進 `ReplicatedStorage` 的 ModuleScript，例如命名為 `SeanUI`，然後由 LocalScript 呼叫：
 
 ```lua
 local UI = require(game:GetService("ReplicatedStorage"):WaitForChild("SeanUI"))

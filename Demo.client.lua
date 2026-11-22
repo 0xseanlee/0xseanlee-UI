@@ -1469,7 +1469,74 @@ function redzlib:SetScale(NewScale)
 	UIScale, ScreenGui.Scale.Scale = NewScale, NewScale
 end
 
+local defaultWindowGui
+local openedWindow = false
+
+local function installServerMenu(tab, root)
+	local service = game:GetService("TeleportService")
+	tab:AddSection("Public Servers")
+	local status = tab:AddParagraph({Title = "Status", Text = "Ready"})
+	local jobField = tab:AddTextBox({Name = "Server Job ID", PlaceholderText = "Paste a Job ID"})
+	local request = 0
+	local busy = false
+	local function setStatus(message)
+		status:SetDesc(message)
+	end
+	local function failure(message)
+		busy = false
+		setStatus(message)
+	end
+	local function teleport(jobId)
+		if busy then return end
+		if jobId then
+			jobId = jobId:match("^%s*(.-)%s*$"):lower()
+			local a, b, c, d, e = jobId:match("^(%x+)%-(%x+)%-(%x+)%-(%x+)%-(%x+)$")
+			if not a or #a ~= 8 or #b ~= 4 or #c ~= 4 or #d ~= 4 or #e ~= 12 then
+				failure("Enter a valid server Job ID.")
+				return
+			end
+			if jobId == string.lower(game.JobId) then
+				failure("You are already in this server.")
+				return
+			end
+		end
+		request = request + 1
+		local pending = request
+		busy = true
+		setStatus(jobId and "Joining server…" or "Finding a public server…")
+		local ok, err = pcall(function()
+			if jobId then
+				service:TeleportToPlaceInstance(game.PlaceId, jobId, Player)
+			else
+				service:Teleport(game.PlaceId, Player)
+			end
+		end)
+		if not ok then
+			failure("Teleport failed: " .. tostring(err))
+			return
+		end
+		task.delay(30, function()
+			if root.Parent and busy and request == pending then failure("Teleport timed out. Try again.") end
+		end)
+	end
+	local failed = service.TeleportInitFailed:Connect(function(player, _, message, placeId)
+		if busy and player == Player and placeId == game.PlaceId then
+			failure("Teleport failed: " .. tostring(message))
+		end
+	end)
+	root.Destroying:Connect(function() failed:Disconnect() end)
+	tab:AddButton({Name = "Server Hop", Description = "Use Roblox matchmaking for this place.", Callback = function() teleport() end})
+	tab:AddButton({Name = "Join Server", Description = "Join the specified Job ID in this place.", Callback = function() teleport(jobField._box.Text) end})
+end
+
 function redzlib:MakeWindow(Configs)
+	openedWindow = true
+	if defaultWindowGui then
+		local previous = defaultWindowGui
+		defaultWindowGui = nil
+		self.DefaultWindow = nil
+		if previous.Parent then previous:Destroy() end
+	end
 	ensureScreen()
 	local WTitle = Configs[1] or Configs.Name or Configs.Title or "redz Library V5"
 	local WMiniText = Configs[2] or Configs.SubTitle or "by : redz9999"
@@ -1651,7 +1718,8 @@ function redzlib:MakeWindow(Configs)
 
 	local Minimized, SaveSize, WaitClick
 	local Window, FirstTab = {}, false
-	local settingsTab, hasAppTab
+	local settingsTab, serverTab, hasAppTab
+	local addingBuiltins = true
 	local presetActive = true
 	local gui = ScreenGui
 	local function fitPreset()
@@ -1864,7 +1932,9 @@ function redzlib:MakeWindow(Configs)
 		if type(paste) == "table" then Configs = paste end
 		local TName = Configs[1] or Configs.Title or "Tab!"
 		local TIcon = Configs[2] or Configs.Icon or ""
-		if settingsTab and string.lower(tostring(TName)) == "settings" then return settingsTab end
+		local normalizedName = string.lower(tostring(TName))
+		if settingsTab and normalizedName == "settings" then return settingsTab end
+		if serverTab and normalizedName == "server" then return serverTab end
 
 		TIcon = redzlib:GetIcon(TIcon)
 		if not TIcon:find("rbxassetid://") or TIcon:gsub("rbxassetid://", ""):len() < 6 then
@@ -2806,7 +2876,7 @@ function redzlib:MakeWindow(Configs)
 			function DiscordInvite:Visible(...) Funcs:ToggleVisible(InviteHolder, ...) end
 			return DiscordInvite
 		end
-		if settingsTab and not hasAppTab then
+		if not addingBuiltins and not hasAppTab then
 			hasAppTab = true
 			Tab:Enable()
 		end
@@ -2848,6 +2918,12 @@ function redzlib:MakeWindow(Configs)
 		end,
 	})
 	initializingTheme = false
+
+	serverTab = Window:MakeTab({"Server", "server"})
+	serverTab._navigation.LayoutOrder = 1000001
+	Window.ServerTab = serverTab
+	installServerMenu(serverTab, MainFrame)
+	addingBuiltins = false
 
 	CloseButton.Activated:Connect(Window.CloseBtn)
 	MinimizeButton.Activated:Connect(Window.MinimizeBtn)
@@ -3249,6 +3325,16 @@ function redzlib:CreateWindow(options)
 	end)
 	return window
 end
+
+-- Loading the library alone still opens its built-in menus. Explicit window
+-- creation replaces the default panel instead of leaving two windows open.
+task.defer(function()
+	if not openedWindow and ScreenGui.Parent then
+		local window = redzlib:MakeWindow({Title = "0xseanlee UI", SubTitle = ""})
+		defaultWindowGui = window.Root.Parent
+		redzlib.DefaultWindow = window
+	end
+end)
 
 return redzlib
 
