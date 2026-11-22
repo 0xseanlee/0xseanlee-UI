@@ -264,36 +264,27 @@ local currentTab = current:MakeTab({"Current", "home"})
 check(currentTab:AddButton({Name = "Current button"}).Frame, "Native control still works")
 local settings = current:MakeTab({"settings"})
 check(settings == current.SettingsTab and currentTab.Cont.Parent, "Settings is fixed and first app tab stays selected")
-local function clickSetting(name)
-    for _, label in ipairs(settings.Cont:GetDescendants()) do
-        if label:IsA("TextLabel") and label.Text == name then
-            label.Parent.Parent.Activated:Fire()
-            return
-        end
-    end
-    error("Missing setting: " .. name)
-end
 local nativeGui = current.Root.Parent
-local function selectSize(name)
+local function selectSetting(name)
     for _, label in ipairs(nativeGui.Dropdown:GetDescendants()) do
         if label:IsA("TextLabel") and label.Text == name and label.Parent.Name == "Option" then
             label.Parent.Activated:Fire()
             return
         end
     end
-    error("Missing size option: " .. name)
+    error("Missing settings option: " .. name)
 end
 local medium = nativeGui.Scale.Scale
-selectSize("Small")
+selectSetting("Small")
 check(nativeGui.Scale.Scale < medium, "Small reduces visible size")
-selectSize("Large")
+selectSetting("Large")
 check(nativeGui.Scale.Scale > medium, "Large increases visible size")
-clickSetting("Red · Redz")
+selectSetting("Red")
 local accent = Library.Themes.Red["Color Theme"]
 check(Library.Save.Theme == "Red" and currentTab.Cont.ScrollBarImageColor3 == accent, "Settings repaints existing controls")
-clickSetting("Blue · 0xseanlee")
+selectSetting("Blue")
 check(currentTab.Cont.ScrollBarImageColor3 == Library.Themes.Blue["Color Theme"])
-selectSize("Medium")
+selectSetting("Medium")
 
 local header = current.Root:FindFirstChild("Top Bar", true)
 current.Root.AbsoluteSize = Vector2.new(550 * medium, 380 * medium)

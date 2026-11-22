@@ -2794,13 +2794,17 @@ function redzlib:MakeWindow(Configs)
 		end,
 	})
 	settingsTab:AddSection("Color Theme")
-	local themeStatus = settingsTab:AddParagraph({Title = "Current theme", Text = redzlib.Save.Theme == "Darker" and "Blue" or redzlib.Save.Theme})
-	for _, option in ipairs({{"Red · Redz", "Red"}, {"Blue · 0xseanlee", "Blue"}}) do
-		settingsTab:AddButton({Name = option[1], Callback = function()
-			redzlib:SetTheme(option[2], false)
-			themeStatus:SetDesc(option[2])
-		end})
-	end
+	local currentTheme = redzlib.Save.Theme
+	local initializingTheme = true
+	settingsTab:AddDropdown({
+		Name = "Theme",
+		Options = {"Red", "Blue"},
+		Default = currentTheme == "Red" and "Red" or "Blue",
+		Callback = function(name)
+			if not initializingTheme then redzlib:SetTheme(name, false) end
+		end,
+	})
+	initializingTheme = false
 
 	CloseButton.Activated:Connect(Window.CloseBtn)
 	MinimizeButton.Activated:Connect(Window.MinimizeBtn)
