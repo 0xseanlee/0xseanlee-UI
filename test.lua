@@ -214,6 +214,7 @@ end
 -- Exercise both APIs against the renderer with Roblox services and signals mocked.
 -- PUC Lua needs shims for the handful of Roblox/Luau-only globals used here.
 unpack = table.unpack
+tick = os.clock
 table.foreach = function(t, fn) for k, v in pairs(t) do fn(k, v) end end
 table.clear = function(t) for k in pairs(t) do t[k] = nil end end
 table.find = function(t, v) for k, item in pairs(t) do if v == item then return k end end end
@@ -273,17 +274,26 @@ local function clickSetting(name)
     error("Missing setting: " .. name)
 end
 local nativeGui = current.Root.Parent
+local function selectSize(name)
+    for _, label in ipairs(nativeGui.Dropdown:GetDescendants()) do
+        if label:IsA("TextLabel") and label.Text == name and label.Parent.Name == "Option" then
+            label.Parent.Activated:Fire()
+            return
+        end
+    end
+    error("Missing size option: " .. name)
+end
 local medium = nativeGui.Scale.Scale
-clickSetting("Small")
+selectSize("Small")
 check(nativeGui.Scale.Scale < medium, "Small reduces visible size")
-clickSetting("Large")
+selectSize("Large")
 check(nativeGui.Scale.Scale > medium, "Large increases visible size")
 clickSetting("Red · Redz")
 local accent = Library.Themes.Red["Color Theme"]
 check(Library.Save.Theme == "Red" and currentTab.Cont.ScrollBarImageColor3 == accent, "Settings repaints existing controls")
 clickSetting("Blue · 0xseanlee")
 check(currentTab.Cont.ScrollBarImageColor3 == Library.Themes.Blue["Color Theme"])
-clickSetting("Medium")
+selectSize("Medium")
 
 local header = current.Root:FindFirstChild("Top Bar", true)
 current.Root.AbsoluteSize = Vector2.new(550 * medium, 380 * medium)

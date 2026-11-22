@@ -2782,15 +2782,17 @@ function redzlib:MakeWindow(Configs)
 	settingsTab._navigation.LayoutOrder = 1000000
 	Window.SettingsTab = settingsTab
 	settingsTab:AddSection("UI Size")
-	local sizeStatus = settingsTab:AddParagraph({Title = "Current size", Text = sizePreset})
-	for _, name in ipairs({"Small", "Medium", "Large"}) do
-		settingsTab:AddButton({Name = name, Callback = function()
+	settingsTab:AddDropdown({
+		Name = "Size",
+		Options = {"Small", "Medium", "Large"},
+		Default = sizePreset,
+		Callback = function(name)
+			if not SIZE_PRESETS[name] or name == sizePreset and presetActive then return end
 			sizePreset = name
 			Window:_setPresetActive(true)
 			MainFrame.Position = UDim2.new(0.5, -MainFrame.Size.X.Offset / 2, 0.5, -MainFrame.Size.Y.Offset / 2)
-			sizeStatus:SetDesc(name)
-		end})
-	end
+		end,
+	})
 	settingsTab:AddSection("Color Theme")
 	local themeStatus = settingsTab:AddParagraph({Title = "Current theme", Text = redzlib.Save.Theme == "Darker" and "Blue" or redzlib.Save.Theme})
 	for _, option in ipairs({{"Red · Redz", "Red"}, {"Blue · 0xseanlee", "Blue"}}) do

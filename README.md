@@ -15,7 +15,7 @@ Main:CreateToggle({Name = "Example", CurrentValue = false, Callback = print})
 
 新程式也可以從同一個網址載入，改用 `MakeWindow`、`MakeTab` 和 `AddToggle`。兩套呼叫共用同一套元件。舊版 `SetSearch` 仍可從程式呼叫，畫面使用新版原有的版面。舊版 `Notify` 使用 Roblox 的通知。
 
-每個視窗都會加上 **Settings**。在 **UI Size** 可選 Small、Medium、Large。在 **Color Theme** 可選 Red · Redz（紅色強調）或 Blue · 0xseanlee（藍色強調）。拖曳視窗頂欄可移動視窗，浮動按鈕也能直接拖曳。設定在這次載入的函式庫中有效。
+每個視窗都會加上 **Settings**。在 **UI Size** 的 **Size** 下拉選單可選 Small、Medium、Large。在 **Color Theme** 可選 Red · Redz（紅色強調）或 Blue · 0xseanlee（藍色強調）。拖曳視窗頂欄可移動視窗，浮動按鈕也能直接拖曳。設定在這次載入的函式庫中有效。
 
 將 [Demo.client.lua](Demo.client.lua) 放進 Roblox Studio 的 `StarterPlayerScripts`，以 Play 開啟空白 Main 分頁與固定的 Settings 分頁。左上的浮動 `0x` 可以切換視窗。要自行建立元件，可把 [Library.lua](Library.lua) 放進 `ReplicatedStorage` 的 ModuleScript，例如命名為 `SeanUI`，然後由 LocalScript 呼叫：
 
