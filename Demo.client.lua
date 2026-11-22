@@ -928,7 +928,7 @@ local SetProps, SetChildren, InsertTheme, Create do
 		local new = Instance.new(args[1])
 		local Children = {}
 
-		if type(args[2]) == "table" then
+		if type(args[2]) == "table" and typeof(args[2]) ~= "Instance" then
 			SetProps(new, args[2])
 			SetChildren(new, args[3])
 			Children = args[3] or {}
@@ -1094,19 +1094,24 @@ local GetFlag, SetFlag, CheckFlag do
 	end)
 end
 
-local ScreenGui = Create("ScreenGui", PlayerGui, {
-	Name = "0xseanleeUI",
-	ResetOnSpawn = false,
-}, {
-	Create("UIScale", {
-		Scale = UIScale,
-		Name = "Scale"
+local function mountScreen()
+	local previous = PlayerGui:FindFirstChild("0xseanleeUI")
+	if previous then previous:Destroy() end
+	return Create("ScreenGui", PlayerGui, {
+		Name = "0xseanleeUI",
+		ResetOnSpawn = false,
+	}, {
+		Create("UIScale", {Scale = UIScale, Name = "Scale"})
 	})
-})
-
-local ScreenFind = PlayerGui:FindFirstChild(ScreenGui.Name)
-if ScreenFind and ScreenFind ~= ScreenGui then
-	ScreenFind:Destroy()
+end
+local ScreenGui = mountScreen()
+local function ensureScreen()
+	if not ScreenGui.Parent then
+		table.clear(redzlib.Tabs)
+		table.clear(redzlib.Options)
+		table.clear(redzlib.Instances)
+		ScreenGui = mountScreen()
+	end
 end
 
 local function GetStr(val)
@@ -1126,12 +1131,14 @@ local function ConnectSave(Instance, func)
 	end)
 end
 
+local reducedMotion = false
 local function CreateTween(Configs)
 	local Instance = Configs[1] or Configs.Instance
 	local Prop = Configs[2] or Configs.Prop
 	local NewVal = Configs[3] or Configs.NewVal
 	local Time = Configs[4] or Configs.Time or 0.5
 	local TweenWait = Configs[5] or Configs.wait or false
+	if reducedMotion then Instance[Prop] = NewVal; return end
 	local TweenInfo = TweenInfo.new(Time, Enum.EasingStyle.Quint)
 
 	local Tween = TweenService:Create(Instance, TweenInfo, {[Prop] = NewVal})
@@ -1287,7 +1294,7 @@ local function ButtonFrame(Instance, Title, Description, HolderSize)
 		Name = "Option"
 	})Make("Corner", Frame, UDim.new(0, 6))
 
-	LabelHolder = Create("Frame", Frame, {
+	local LabelHolder = Create("Frame", Frame, {
 		AutomaticSize = "Y",
 		BackgroundTransparency = 1,
 		Size = HolderSize,
@@ -1404,6 +1411,7 @@ function redzlib:SetScale(NewScale)
 end
 
 function redzlib:MakeWindow(Configs)
+	ensureScreen()
 	local WTitle = Configs[1] or Configs.Name or Configs.Title or "redz Library V5"
 	local WMiniText = Configs[2] or Configs.SubTitle or "by : redz9999"
 
@@ -1581,6 +1589,7 @@ function redzlib:MakeWindow(Configs)
 
 	local Minimized, SaveSize, WaitClick
 	local Window, FirstTab = {}, false
+	Window.Root = MainFrame
 	function Window:CloseBtn()
 		local Dialog = Window:Dialog({
 			Title = "Close",
@@ -1868,6 +1877,7 @@ function redzlib:MakeWindow(Configs)
 		local Tab = {}
 		table.insert(redzlib.Tabs, {TabInfo = {Name = TName, Icon = TIcon}, func = Tab, Cont = Container})
 		Tab.Cont = Container
+		Tab._selectSignal = TabSelect.Activated
 
 		function Tab:Disable()
 			Container.Parent = nil
@@ -1906,7 +1916,7 @@ function redzlib:MakeWindow(Configs)
 				TextXAlignment = "Left"
 			}), "Text")
 
-			local Section = {}
+			local Section = {Frame = SectionFrame}
 			table.insert(redzlib.Options, {type = "Section", Name = SectionName, func = Section})
 			function Section:Visible(Bool)
 				if Bool == nil then SectionFrame.Visible = not SectionFrame.Visible return end
@@ -1928,7 +1938,7 @@ function redzlib:MakeWindow(Configs)
 
 			local Frame, LabelFunc = ButtonFrame(Container, PName, PDesc, UDim2.new(1, -20))
 
-			local Paragraph = {}
+			local Paragraph = {Frame = Frame}
 			function Paragraph:Visible(...) Funcs:ToggleVisible(Frame, ...) end
 			function Paragraph:Destroy() Frame:Destroy() end
 			function Paragraph:SetTitle(Val)
@@ -1963,10 +1973,10 @@ function redzlib:MakeWindow(Configs)
 			})
 
 			FButton.Activated:Connect(function()
-				Funcs:FireCallback(Callback)
+				if not Configs._legacy or Configs._legacy.canUse() then Funcs:FireCallback(Callback) end
 			end)
 
-			local Button = {}
+			local Button = {Frame = FButton}
 			function Button:Visible(...) Funcs:ToggleVisible(FButton, ...) end
 			function Button:Destroy() FButton:Destroy() end
 			function Button:Callback(...) Funcs:InsertCallback(Callback, ...) end
@@ -2015,7 +2025,7 @@ function redzlib:MakeWindow(Configs)
 
 			local WaitClick
 			local function SetToggle(Val)
-				if WaitClick then return end
+				if WaitClick and not Configs._legacy then return end
 
 				WaitClick, Default = true, Val
 				SetFlag(Flag, Default)
@@ -2030,13 +2040,14 @@ function redzlib:MakeWindow(Configs)
 					CreateTween({Toggle, "AnchorPoint", Vector2.new(0, 0.5), 0.25, Wait or false})
 				end
 				WaitClick = false
-			end;task.spawn(SetToggle, Default)
+			end
+			if Configs._legacy then SetToggle(Default) else task.spawn(SetToggle, Default) end
 
 			Button.Activated:Connect(function()
-				SetToggle(not Default)
+				if not Configs._legacy or Configs._legacy.canUse() then SetToggle(not Default) end
 			end)
 
-			local Toggle = {}
+			local Toggle = {Frame = Button, _apply = SetToggle}
 			function Toggle:Visible(...) Funcs:ToggleVisible(Button, ...) end
 			function Toggle:Destroy() Button:Destroy() end
 			function Toggle:Callback(...) Funcs:InsertCallback(Callback, ...)() end
@@ -2163,7 +2174,7 @@ function redzlib:MakeWindow(Configs)
 			end
 
 			local function Minimize()
-				if WaitClick then return end
+				if WaitClick or (Configs._legacy and not Configs._legacy.canUse()) then return end
 				WaitClick = true
 				if NoClickFrame.Visible then
 					Arrow.Image = "rbxassetid://10709791523"
@@ -2191,7 +2202,7 @@ function redzlib:MakeWindow(Configs)
 				CreateTween({DropFrame, "Position", NewPos, 0.1})
 			end
 
-			local AddNewOptions, GetOptions, AddOption, RemoveOption, Selected do
+			local AddNewOptions, GetOptions, AddOption, RemoveOption, Selected, ApplySelection do
 				local Default = type(OpDefault) ~= "table" and {OpDefault} or OpDefault
 				local MultiSelect = DMultiSelect
 				local Options = {}
@@ -2246,7 +2257,13 @@ function redzlib:MakeWindow(Configs)
 					UpdateLabel()
 				end
 
+				ApplySelection = function(value)
+					Selected = value
+					UpdateSelected()
+				end
+
 				local function Select(Option)
+					if Configs._legacy and not Configs._legacy.canUse() then return end
 					if MultiSelect then
 						Option.Stats = not Option.Stats
 						Option.LastCB = tick()
@@ -2353,7 +2370,7 @@ function redzlib:MakeWindow(Configs)
 			CalculatePos()
 			CalculateSize()
 
-			local Dropdown = {}
+			local Dropdown = {Frame = Button, _apply = ApplySelection, _close = function() if NoClickFrame.Visible then Disable() end end}
 			function Dropdown:Visible(...) Funcs:ToggleVisible(Button, ...) end
 			function Dropdown:Destroy() Button:Destroy() end
 			function Dropdown:Callback(...) Funcs:InsertCallback(Callback, ...)(Selected) end
@@ -2464,9 +2481,10 @@ function redzlib:MakeWindow(Configs)
 
 			local function UpdateLabel(NewValue)
 				local Number = tonumber(NewValue * Increase)
-				Number = math.floor(Number * 100) / 100
+				local legacy = Configs._legacy
+				Number = legacy and legacy.quantize(Number) or math.floor(Number * 100) / 100
 
-				Default, LabelVal.Text = Number, tostring(Number)
+				Default, LabelVal.Text = Number, tostring(Number)..(legacy and legacy.suffix or "")
 				Funcs:FireCallback(Callback, Default)
 			end
 
@@ -2481,11 +2499,14 @@ function redzlib:MakeWindow(Configs)
 			local function UpdateValues()
 				Indicator.Size = UDim2.new(SliderIcon.Position.X.Scale, 0, 1, 0)
 				local SliderPos = SliderIcon.Position.X.Scale
-				local NewValue = math.floor(((SliderPos * Max) / Max) * (Max - Min) + Min)
+				local NewValue = SliderPos * (Max - Min) + Min
+				if Configs._legacy and SliderPos == 1 then NewValue = Max end
+				if not Configs._legacy then NewValue = math.floor(NewValue) end
 				UpdateLabel(NewValue)
 			end
 
 			SliderHolder.MouseButton1Down:Connect(function()
+				if Configs._legacy and not Configs._legacy.canUse() then return end
 				CreateTween({SliderIcon, "Transparency", 0, 0.3})
 				Container.ScrollingEnabled = false
 				while UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do task.wait()
@@ -2513,11 +2534,16 @@ function redzlib:MakeWindow(Configs)
 
 				SetFlag(Flag, NewValue)
 				CreateTween({ SliderIcon, "Position", UDim2.fromScale(math.clamp(SliderPos, 0, 1), 0.5), 0.3, true })
-			end;SetSlider(Default)
+			end
+			if not Configs._legacy then SetSlider(Default) end
 
 			SliderIcon:GetPropertyChangedSignal("Position"):Connect(UpdateValues)UpdateValues()
 
-			local Slider = {}
+			local Slider = {Frame = Button}
+			function Slider:_apply(value)
+				SliderIcon.Position = UDim2.fromScale((value / Increase - Min) / (Max - Min), 0.5)
+				UpdateValues()
+			end
 			function Slider:Set(NewVal1, NewVal2)
 				if NewVal1 and NewVal2 then
 					LabelFunc:SetTitle(NewVal1)
@@ -2577,7 +2603,7 @@ function redzlib:MakeWindow(Configs)
 				BackgroundTransparency = 1
 			})
 
-			local TextBox = {}
+			local TextBox = {Frame = Button, _box = TextBoxInput}
 			local function Input()
 				local Text = TextBoxInput.Text
 				if Text:gsub(" ", ""):len() > 0 then
@@ -2587,7 +2613,7 @@ function redzlib:MakeWindow(Configs)
 				end
 			end
 
-			TextBoxInput.FocusLost:Connect(Input)Input()
+			if not Configs._legacy then TextBoxInput.FocusLost:Connect(Input); Input() end
 
 			TextBoxInput.FocusLost:Connect(function()
 				CreateTween({Pencil, "ImageColor3", Color3.fromRGB(255, 255, 255), 0.2})
@@ -2702,6 +2728,396 @@ function redzlib:MakeWindow(Configs)
 	CloseButton.Activated:Connect(Window.CloseBtn)
 	MinimizeButton.Activated:Connect(Window.MinimizeBtn)
 	return Window
+end
+
+-- Compatibility with the v0.x public API. Controls are built by the native
+-- MakeWindow / MakeTab / Add methods above.
+local legacyWindow
+local function finite(value)
+	return type(value) == "number" and value == value and math.abs(value) < math.huge
+end
+
+local function legacyKey(value)
+	if type(value) == "string" then
+		local ok, key = pcall(function() return Enum.KeyCode[value] end)
+		value = ok and key or nil
+	end
+	if typeof(value) == "EnumItem" and value.EnumType == Enum.KeyCode and value ~= Enum.KeyCode.Unknown then
+		return value
+	end
+end
+
+function redzlib:CreateWindow(options)
+	options = options or {}
+	assert(options.Scale == nil or (finite(options.Scale) and options.Scale > 0), "Scale must be a positive finite number")
+	local toggleKey = assert(legacyKey(options.ToggleKey or Enum.KeyCode.RightShift), "Invalid ToggleKey")
+	if legacyWindow then legacyWindow:Destroy() end
+	ensureScreen()
+
+	reducedMotion = options.ReducedMotion == true
+	local previousTheme = Theme
+	if options.AccentColor then
+		Theme = {}
+		for key, value in pairs(previousTheme) do Theme[key] = value end
+		Theme["Color Theme"] = options.AccentColor
+	end
+	local title, subtitle = options.Name or "0xseanlee UI", options.Subtitle or "Your workspace"
+	local native = self:MakeWindow({Title = title, SubTitle = subtitle})
+	local gui = ScreenGui
+	local window = {Root = native.Root, Gui = gui, Tabs = {}, Values = {}}
+	legacyWindow = window
+	local connections, controls, bindings = {}, {}, {}
+	local destroyed, query, capture = false, "", nil
+	local requestedScale = options.Scale or 1
+
+	local function connect(signal, fn)
+		connections[#connections + 1] = signal:Connect(fn)
+	end
+	local function cancelCapture()
+		if capture then
+			capture._box.Text = capture.Value.Name
+			capture = nil
+		end
+	end
+	local function invoke(fn, ...)
+		if type(fn) ~= "function" or destroyed then return end
+		local ok, err = pcall(fn, ...)
+		if not ok then warn("[0xseanlee UI] " .. tostring(err)) end
+	end
+	local function match(value)
+		return query == "" or string.find(string.lower(value), query, 1, true) ~= nil
+	end
+	local function refresh()
+		for _, tab in ipairs(window.Tabs) do
+			for _, section in ipairs(tab._sections) do
+				section.Frame.Visible = section._visible and query == ""
+			end
+			for _, control in ipairs(tab._controls) do
+				local section = control._section
+				local text = control._name .. " " .. control._description .. " " .. (section and section._name or "")
+				control.Frame.Visible = control._visible and match(text)
+				if control.Frame.Visible and section and section._visible then section.Frame.Visible = true end
+			end
+		end
+		if capture and not capture:_canUse() then cancelCapture() end
+	end
+	local function fit()
+		local size, root = gui.AbsoluteSize, native.Root.Size
+		if size.X <= 20 or size.Y <= 20 then return end
+		UIScale = math.min(requestedScale, (size.X - 20) / math.max(1, root.X.Offset), (size.Y - 20) / math.max(1, root.Y.Offset))
+		gui.Scale.Scale = UIScale
+	end
+	local function closeDropdowns()
+		for _, control in ipairs(controls) do
+			if control._native._close then control._native._close() end
+		end
+	end
+
+	function window:SetScale(value)
+		if not finite(value) or value <= 0 then return false end
+		requestedScale = value
+		fit()
+		return true
+	end
+	function window:SetReducedMotion(value) reducedMotion = value == true end
+	function window:SetTitle(value) title = tostring(value); native:Set(title, subtitle) end
+	function window:SetSubtitle(value) subtitle = tostring(value); native:Set(title, subtitle) end
+	function window:ResetPosition()
+		local size = native.Root.Size
+		native.Root.Position = UDim2.new(0.5, -size.X.Offset / 2, 0.5, -size.Y.Offset / 2)
+	end
+	function window:SetVisible(value)
+		cancelCapture()
+		native.Root.Visible = value == true
+		local focused = UserInputService:GetFocusedTextBox()
+		if not native.Root.Visible and focused and focused:IsDescendantOf(gui) then focused:ReleaseFocus(false) end
+	end
+	function window:SetSearch(value)
+		query = string.lower(tostring(value or ""))
+		closeDropdowns()
+		refresh()
+		local focused = UserInputService:GetFocusedTextBox()
+		if focused then
+			for _, control in ipairs(controls) do
+				if not control.Frame.Visible and focused:IsDescendantOf(control.Frame) then focused:ReleaseFocus(false); break end
+			end
+		end
+	end
+	function window:GetControl(flag)
+		for _, control in ipairs(controls) do if control.Flag == flag then return control end end
+	end
+	function window:Notify(value)
+		local message = type(value) == "table" and value or {Content = value}
+		pcall(function()
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title = tostring(message.Title or "0xseanlee UI"),
+				Text = tostring(message.Content or ""),
+				Duration = finite(message.Duration) and math.clamp(message.Duration, 1, 30) or 3,
+			})
+		end)
+	end
+	local function cleanup()
+		if destroyed then return end
+		destroyed = true
+		for _, conn in ipairs(connections) do conn:Disconnect() end
+		if legacyWindow == window then
+			legacyWindow = nil
+			Theme = previousTheme
+			reducedMotion = false
+			table.clear(redzlib.Tabs)
+			table.clear(redzlib.Options)
+			table.clear(redzlib.Instances)
+		end
+	end
+	function window:Destroy()
+		if destroyed then return end
+		cleanup()
+		gui:Destroy()
+	end
+	connect(gui.Destroying, cleanup)
+	connect(gui:GetPropertyChangedSignal("AbsoluteSize"), fit)
+	fit()
+	window:ResetPosition()
+
+	local launcher = native:AddMinimizeButton({Corner = {CornerRadius = UDim.new(0.25, 0)}}).Button
+	local mark = Instance.new("TextLabel")
+	mark.Size = UDim2.fromScale(1, 1)
+	mark.Text = "0x"
+	mark.TextScaled = true
+	mark.Font = Enum.Font.GothamBold
+	mark.TextColor3 = Color3.fromRGB(255, 255, 255)
+	mark.BackgroundColor3 = Color3.fromRGB(24, 29, 33)
+	mark.BorderSizePixel = 0
+	mark.Parent = launcher
+	local radius = Instance.new("UICorner")
+	radius.CornerRadius = UDim.new(0.25, 0)
+	radius.Parent = mark
+	launcher.Visible = false
+	connect(native.Root:GetPropertyChangedSignal("Visible"), function()
+		launcher.Visible = not native.Root.Visible
+		if launcher.Visible then cancelCapture() end
+	end)
+
+	function window:CreateTab(name, icon)
+		if type(name) == "table" then name, icon = name.Name, name.Icon end
+		local tab = {Name = name or "Tab", _controls = {}, _sections = {}}
+		local nativeTab = native:MakeTab({tab.Name, icon or "list"})
+		table.insert(self.Tabs, tab)
+		if not self.SelectedTab then self.SelectedTab = tab end
+		local function selected()
+			if window.SelectedTab ~= tab then closeDropdowns() end
+			window.SelectedTab = tab
+			cancelCapture()
+			refresh()
+		end
+		connect(nativeTab._selectSignal, selected)
+		function tab:Select()
+			if destroyed then return end
+			nativeTab:Enable()
+			selected()
+		end
+		function tab:CreateSection(name)
+			local raw = nativeTab:AddSection(tostring(name))
+			local section = {Frame = raw.Frame, _name = tostring(name), _visible = true}
+			function section:Set(value)
+				self._name = tostring(value)
+				raw:Set(self._name)
+				refresh()
+			end
+			function section:SetVisible(value)
+				self._visible = value == true
+				refresh()
+			end
+			tab._section = section
+			table.insert(tab._sections, section)
+			refresh()
+			return section
+		end
+		local function control(opts, method, config)
+			local obj = {
+				Flag = opts.Flag, _name = tostring(config.Name or opts.Name or "Element"),
+				_description = tostring(config.Description or opts.Description or ""),
+				_visible = true, _disabled = opts.Disabled == true, _section = tab._section,
+			}
+			function obj:_canUse()
+				return not destroyed and not self._disabled and self.Frame and self.Frame.Visible
+					and tab == window.SelectedTab and native.Root.Visible
+			end
+			function obj:_change(value, silent)
+				local changed = value ~= self.Value
+				self.Value = value
+				if self.Flag then window.Values[self.Flag] = value end
+				if changed and not silent then invoke(opts.Callback, value) end
+			end
+			function obj:SetVisible(value)
+				self._visible = value == true
+				if not self._visible and self._native._close then self._native._close() end
+				refresh()
+			end
+			function obj:SetDisabled(value)
+				self._disabled = value == true
+				if self._box then
+					self._box.TextEditable = not self._disabled and not self._isKey
+					if self._disabled and UserInputService:GetFocusedTextBox() == self._box then self._box:ReleaseFocus(false) end
+				end
+				if self._disabled and self._native._close then self._native._close() end
+				if self._disabled and capture == self then cancelCapture() end
+			end
+			config.Name, config.Description = obj._name, obj._description
+			config._legacy = {canUse = function() return obj:_canUse() end, quantize = config.quantize, suffix = opts.Suffix}
+			config.Callback = function(value)
+				if not obj:_canUse() or obj._applying then return end
+				if method == "AddButton" then invoke(opts.Callback) else obj:_change(value) end
+			end
+			obj._native = nativeTab[method](nativeTab, config)
+			obj.Frame = obj._native.Frame
+			table.insert(tab._controls, obj)
+			table.insert(controls, obj)
+			refresh()
+			return obj
+		end
+		function tab:CreateButton(opts)
+			local obj = control(opts, "AddButton", {})
+			function obj:Set(value)
+				self._name = tostring(value)
+				self._native:Set(self._name)
+				refresh()
+			end
+			return obj
+		end
+		function tab:CreateParagraph(opts)
+			local obj = control(opts, "AddParagraph", {Name = opts.Title or opts.Name or "Paragraph", Title = opts.Title or opts.Name or "Paragraph", Text = tostring(opts.Content or ""), Description = tostring(opts.Content or "")})
+			function obj:Set(value)
+				if value.Title ~= nil then self._name = tostring(value.Title); self._native:SetTitle(self._name) end
+				if value.Content ~= nil then self._description = tostring(value.Content); self._native:SetDesc(self._description) end
+				refresh()
+			end
+			return obj
+		end
+		function tab:CreateToggle(opts)
+			local obj = control(opts, "AddToggle", {Default = opts.CurrentValue == true})
+			function obj:Set(value, silent)
+				value = value == true
+				self._applying = true
+				self._native._apply(value)
+				self._applying = false
+				self:_change(value, silent)
+			end
+			obj:_change(opts.CurrentValue == true, true)
+			return obj
+		end
+		function tab:CreateSlider(opts)
+			local range, step = opts.Range or {0, 100}, opts.Increment or 1
+			local low, high = range[1], range[2]
+			assert(finite(low) and finite(high) and high > low, "Invalid Slider Range")
+			assert(finite(step) and step > 0, "Invalid Slider Increment")
+			assert(opts.CurrentValue == nil or finite(opts.CurrentValue), "Invalid Slider CurrentValue")
+			local function quantize(value)
+				value = math.clamp(value, low, high)
+				if value ~= high then value = math.clamp(low + math.floor((value - low) / step + 0.5) * step, low, high) end
+				return tonumber(string.format("%.8f", value))
+			end
+			local obj = control(opts, "AddSlider", {Min = low, Max = high, Increase = step, Default = opts.CurrentValue or low, quantize = quantize})
+			function obj:Set(value, silent)
+				value = tonumber(value)
+				if not finite(value) then return false end
+				value = quantize(value)
+				self._applying = true
+				self._native:_apply(value)
+				self._applying = false
+				self:_change(value, silent)
+				return true
+			end
+			obj:Set(opts.CurrentValue or low, true)
+			return obj
+		end
+		function tab:CreateDropdown(opts)
+			local values = {}
+			for _, value in ipairs(opts.Options or {}) do values[#values + 1] = value end
+			local obj = control(opts, "AddDropdown", {Options = values})
+			local function contains(value)
+				for _, candidate in ipairs(values) do if candidate == value then return true end end
+				return false
+			end
+			function obj:Set(value, silent)
+				if not contains(value) then return false end
+				self._native._apply(value)
+				self:_change(value, silent)
+				return true
+			end
+			function obj:Refresh(newValues)
+				assert(type(newValues) == "table", "Dropdown options must be a table")
+				values = {}
+				for _, value in ipairs(newValues) do values[#values + 1] = value end
+				local current = self.Value
+				if not contains(current) then current = values[1] end
+				self._applying = true
+				self._native:Set(values)
+				self._native._apply(current)
+				self._applying = false
+				self:_change(current, true)
+			end
+			local current = opts.CurrentOption
+			if not contains(current) then current = values[1] end
+			obj._native._apply(current)
+			obj:_change(current, true)
+			return obj
+		end
+		function tab:CreateInput(opts)
+			local obj = control(opts, "AddTextBox", {PlaceholderText = opts.PlaceholderText})
+			obj._box = obj._native._box
+			function obj:Set(value, silent)
+				self._box.Text = tostring(value)
+				self:_change(self._box.Text, silent)
+			end
+			connect(obj._box.FocusLost, function(enter)
+				if obj:_canUse() and (not opts.EnterOnly or enter) then obj:Set(obj._box.Text)
+				else obj._box.Text = obj.Value end
+			end)
+			obj:Set(opts.CurrentValue or "", true)
+			obj:SetDisabled(opts.Disabled)
+			return obj
+		end
+		function tab:CreateKeybind(opts)
+			local obj = control(opts, "AddTextBox", {})
+			obj._box, obj._isKey = obj._native._box, true
+			function obj:Set(value)
+				local key = legacyKey(value)
+				if not key then return false end
+				if capture == self then cancelCapture() end
+				self:_change(key, true)
+				self._box.Text = key.Name
+				return true
+			end
+			assert(obj:Set(opts.CurrentKeybind or Enum.KeyCode.F), "Invalid CurrentKeybind")
+			obj:SetDisabled(opts.Disabled)
+			connect(obj.Frame.Activated, function()
+				if not obj:_canUse() then return end
+				cancelCapture()
+				capture = obj
+				obj._box.Text = "Press a key..."
+			end)
+			bindings[#bindings + 1] = {control = obj, callback = opts.Callback}
+			return obj
+		end
+		return tab
+	end
+
+	connect(UserInputService.InputBegan, function(input, processed)
+		if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+		local key = input.KeyCode
+		if capture then
+			if key == Enum.KeyCode.Escape then cancelCapture() else capture:Set(key) end
+			return
+		end
+		if key == Enum.KeyCode.Escape and native.Root.Visible then closeDropdowns(); return end
+		if processed or UserInputService:GetFocusedTextBox() then return end
+		if key == toggleKey then window:SetVisible(not native.Root.Visible); return end
+		for _, binding in ipairs(bindings) do
+			if binding.control.Value == key and binding.control:_canUse() then invoke(binding.callback, key) end
+		end
+	end)
+	return window
 end
 
 return redzlib
