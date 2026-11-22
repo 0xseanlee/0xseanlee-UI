@@ -1,6 +1,6 @@
 -- 0xseanlee UI: paste this entire file into your Lua executor.
 local Library = (function()
--- 0xseanlee UI v0.4.0 | Standalone, independently implemented Roblox UI.
+-- 0xseanlee UI v0.5.0 | Standalone, independently implemented Roblox UI.
 -- No remote assets, network requests, or telemetry.
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -9,17 +9,17 @@ local TextService = game:GetService("TextService")
 local Library = {}
 local activeWindow
 local BASE = {
-    Sidebar = Color3.fromRGB(20, 21, 25),
-    Row = Color3.fromRGB(28, 29, 35), Hover = Color3.fromRGB(37, 39, 48),
-    Field = Color3.fromRGB(42, 44, 54), Border = Color3.fromRGB(62, 64, 77),
+    Sidebar = Color3.fromRGB(25, 25, 27),
+    Row = Color3.fromRGB(33, 33, 36), Hover = Color3.fromRGB(42, 42, 47),
+    Field = Color3.fromRGB(46, 46, 51), Border = Color3.fromRGB(58, 58, 65),
     Text = Color3.fromRGB(250, 250, 250), Muted = Color3.fromRGB(200, 200, 200),
-    Dim = Color3.fromRGB(145, 147, 163), Accent = Color3.fromRGB(88, 101, 242),
+    Dim = Color3.fromRGB(145, 147, 163), Accent = Color3.fromRGB(113, 106, 230),
     Inactive = Color3.fromRGB(61, 67, 135),
 }
 -- Keep the original desktop dimensions while reflowing the controls on small viewports.
-local STYLE = {Width=825, Height=570, Sidebar=240, Header=42, ContentX=255,
-    ContentTop=105, CardRadius=9, RowHeight=38, DescriptionHeight=54,
-    ControlFont=16, DescriptionFont=12, FieldWidth=225, FieldHeight=27}
+local STYLE = {Width=560, Height=390, Sidebar=150, Header=32, ContentX=159,
+    ContentTop=72, CardRadius=5, RowHeight=29, DescriptionHeight=44,
+    ControlFont=13, DescriptionFont=11, FieldWidth=130, FieldHeight=22}
 local COMPACT = {Inset=12, Header=48, TabHeight=42, TabGap=7, ContentTop=155, FieldHeight=38}
 local FONTS={}
 local measureFont=Enum.Font.Gotham
@@ -167,11 +167,11 @@ function Library:CreateWindow(options)
     local rowWidth=width-STYLE.ContentX-24
     local compact=false
     local root=new("Frame",{Name="Window",AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),Size=UDim2.fromOffset(width,height),BackgroundColor3=Color3.new(1,1,1),BackgroundTransparency=0.03,BorderSizePixel=0,ClipsDescendants=true,Active=true},gui)
-    corner(root,12); stroke(root,C.Border,0.65)
+    corner(root,8); stroke(root,C.Border,0.65)
     new("UIGradient",{Rotation=90,Color=ColorSequence.new({
-        ColorSequenceKeypoint.new(0,Color3.fromRGB(16,17,21)),
-        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(23,24,30)),
-        ColorSequenceKeypoint.new(1,Color3.fromRGB(17,18,22)),
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(23,23,26)),
+        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(34,34,38)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(25,25,28)),
     })},root)
     window.Root=root
     local scaler=new("UIScale",{Scale=1},root)
@@ -189,9 +189,8 @@ function Library:CreateWindow(options)
     new("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Bottom},toastHost)
     function window:SetReducedMotion(value) self._reducedMotion=value==true end
     local header=button(root,{Name="Header",Size=UDim2.new(1,-95,0,STYLE.Header)})
-    local headerMark=new("Frame",{Name="BrandMark",Position=UDim2.new(0,15,0.5,-8),Size=UDim2.fromOffset(4,16),BackgroundColor3=C.Accent,BorderSizePixel=0},header)
-    corner(headerMark,2)
-    local heading=text(header,options.Name or "0xseanlee UI",18,C.Text,{Position=UDim2.fromOffset(28,0),Size=UDim2.new(0.6,-28,1,0),Font=Enum.Font.GothamBold})
+    local headerRule=new("Frame",{Name="HeaderRule",BackgroundColor3=C.Border,BorderSizePixel=0},root)
+    local heading=text(header,options.Name or "0xseanlee UI",15,C.Text,{Position=UDim2.fromOffset(10,0),Size=UDim2.new(0.6,-10,1,0),Font=Enum.Font.GothamBold})
     local subtitle=text(header,options.Subtitle or "Your workspace",11,C.Muted,{Position=UDim2.fromScale(0.62,0),Size=UDim2.fromScale(0.36,1)})
     local function headerButton(name,close)
         local b=button(root,{Name=name,AnchorPoint=Vector2.new(1,0),BackgroundColor3=C.Field})
@@ -204,8 +203,8 @@ function Library:CreateWindow(options)
         return b
     end
     local minimize,close=headerButton("Minimize",false),headerButton("Close",true)
-    local restore=button(gui,{Name="Restore",Text="0x",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=C.Text,BackgroundTransparency=0,BackgroundColor3=C.Sidebar,Position=UDim2.fromOffset(14,100),Size=UDim2.fromOffset(48,48),Visible=false})
-    corner(restore,13); stroke(restore,C.Accent,0.55)
+    local restore=button(gui,{Name="Restore",Text="0x",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=C.Text,BackgroundTransparency=0,BackgroundColor3=C.Sidebar,Position=UDim2.fromOffset(14,100),Size=UDim2.fromOffset(39,39),Visible=false})
+    corner(restore,8); stroke(restore,C.Accent,0.55)
     local function cancelInteraction()
         if window._drag and window._drag.Finish then window._drag.Finish() end
         window._drag=nil
@@ -267,16 +266,14 @@ function Library:CreateWindow(options)
     local sidebar=new("ScrollingFrame",{Name="Sidebar",Position=UDim2.fromOffset(15,15),Size=UDim2.new(1,-30,1,-68),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=2,ScrollBarImageColor3=C.Accent,ScrollBarImageTransparency=0.75,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y},rail)
     local tabLayout=new("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
     local divider=new("Frame",{Name="Divider",BackgroundColor3=C.Border,BackgroundTransparency=0.3,BorderSizePixel=0},root)
-    local tabCount=text(rail,"0 tabs",11,C.Dim,{Position=UDim2.new(0,18,1,-44),Size=UDim2.new(1,-36,0,16)})
-    local shortcut=text(rail,toggleKey.Name.."  to hide",10,C.Muted,{Position=UDim2.new(0,18,1,-26),Size=UDim2.new(1,-36,0,16)})
     local pageHeader=new("Frame",{Position=UDim2.fromOffset(STYLE.ContentX,STYLE.Header+15),Size=UDim2.new(1,-STYLE.ContentX-15,0,38),BackgroundTransparency=1},root)
     local pageTitle=text(pageHeader,"",18,C.Text,{Size=UDim2.new(0.5,-10,0,23),Font=Enum.Font.GothamBold})
     local pageCount=text(pageHeader,"",10,C.Muted,{Position=UDim2.fromOffset(0,24),Size=UDim2.new(0.5,-10,0,14)})
     local searchWrap=new("Frame",{AnchorPoint=Vector2.new(1,0),Position=UDim2.fromScale(1,0),Size=UDim2.fromOffset(222,34),BackgroundColor3=C.Row,BorderSizePixel=0},pageHeader)
     corner(searchWrap,8); local searchStroke=stroke(searchWrap,C.Border,0.5)
-    local searchIcon=icon(searchWrap,"search",C.Dim); searchIcon.Position=UDim2.fromOffset(8,6)
+    local searchIcon=icon(searchWrap,"search",C.Dim); searchIcon.AnchorPoint=Vector2.new(0,0.5); searchIcon.Position=UDim2.new(0,8,0.5,0)
     local search=new("TextBox",{Name="Search",Position=UDim2.fromOffset(35,0),Size=UDim2.new(1,-66,1,0),BackgroundTransparency=1,Text="",PlaceholderText="Search controls...",PlaceholderColor3=C.Dim,TextColor3=C.Text,TextSize=12,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left,ClearTextOnFocus=false},searchWrap)
-    local clear=button(searchWrap,{Name="Clear",Position=UDim2.new(1,-29,0,5),Size=UDim2.fromOffset(24,24),Visible=false})
+    local clear=button(searchWrap,{Name="Clear",AnchorPoint=Vector2.new(0,0.5),Position=UDim2.new(1,-29,0.5,0),Size=UDim2.fromOffset(24,24),Visible=false})
     line(clear,9,9,15,15,C.Muted); line(clear,15,9,9,15,C.Muted)
     local content=new("Frame",{Name="Content",Position=UDim2.fromOffset(STYLE.ContentX,STYLE.ContentTop),Size=UDim2.new(1,-STYLE.ContentX-15,1,-STYLE.ContentTop-15),BackgroundTransparency=1},root)
     local empty=text(content,"No matching controls",14,C.Muted,{TextXAlignment=Enum.TextXAlignment.Center,Visible=false})
@@ -287,12 +284,15 @@ function Library:CreateWindow(options)
             tab._indicator.Position=UDim2.new(0.5,0,1,-2)
             tab._indicator.Size=UDim2.fromOffset(24,2)
         else
-            tab._nav.Size=UDim2.new(1,-2,0,36)
+            tab._nav.Size=UDim2.new(1,-2,0,27)
             tab._indicator.AnchorPoint=Vector2.new(0,0.5)
             tab._indicator.Position=UDim2.fromScale(0,0.5)
             tab._indicator.Size=UDim2.fromOffset(3,16)
         end
-        tab._icon.Position=UDim2.fromOffset(12,compact and 10 or 7)
+        tab._icon.Position=UDim2.fromOffset(8,compact and 10 or 5)
+        tab._icon:FindFirstChildOfClass("UIScale").Scale=compact and 1 or 0.72
+        tab._text.Position=UDim2.fromOffset(compact and 37 or 30,0)
+        tab._text.TextSize=compact and 15 or 12
     end
     local function revealTab()
         if not compact or not window.SelectedTab then return end
@@ -316,16 +316,16 @@ function Library:CreateWindow(options)
         local contentX=compact and COMPACT.Inset or STYLE.ContentX
         local rightInset=compact and COMPACT.Inset or 15
         local showsSubtitle=not compact or width>=440
-        local buttonSize=compact and 42 or 38
-        header.Size=UDim2.new(1,compact and -104 or -100,0,headerHeight)
-        heading.Size=showsSubtitle and UDim2.new(0.6,-28,1,0) or UDim2.new(1,-36,1,0)
+        local buttonSize=compact and 42 or 25
+        header.Size=UDim2.new(1,compact and -104 or -65,0,headerHeight)
+        headerRule.Position=UDim2.fromOffset(0,headerHeight)
+        headerRule.Size=UDim2.new(1,0,0,1)
+        heading.Size=showsSubtitle and UDim2.new(0.6,-10,1,0) or UDim2.new(1,-18,1,0)
         subtitle.Visible=showsSubtitle
         minimize.Size=UDim2.fromOffset(buttonSize,buttonSize)
         close.Size=UDim2.fromOffset(buttonSize,buttonSize)
-        minimize.Position=UDim2.new(1,-53,0,(headerHeight-buttonSize)/2)
+        minimize.Position=UDim2.new(1,compact and -53 or -36,0,(headerHeight-buttonSize)/2)
         close.Position=UDim2.new(1,-8,0,(headerHeight-buttonSize)/2)
-        tabCount.Visible=not compact
-        shortcut.Visible=not compact
         if compact then
             rail.Position=UDim2.fromOffset(0,headerHeight)
             rail.Size=UDim2.new(1,0,0,53)
@@ -336,21 +336,23 @@ function Library:CreateWindow(options)
         else
             rail.Position=UDim2.fromOffset(0,headerHeight)
             rail.Size=UDim2.new(0,STYLE.Sidebar,1,-headerHeight)
-            sidebar.Position=UDim2.fromOffset(15,15)
-            sidebar.Size=UDim2.new(1,-30,1,-68)
+            sidebar.Position=UDim2.fromOffset(7,8)
+            sidebar.Size=UDim2.new(1,-14,1,-16)
             divider.Position=UDim2.fromOffset(STYLE.Sidebar,headerHeight+15)
             divider.Size=UDim2.new(0,1,1,-headerHeight-30)
         end
         sidebar.AutomaticCanvasSize=compact and Enum.AutomaticSize.X or Enum.AutomaticSize.Y
         sidebar.ScrollingDirection=compact and Enum.ScrollingDirection.X or Enum.ScrollingDirection.Y
         tabLayout.FillDirection=compact and Enum.FillDirection.Horizontal or Enum.FillDirection.Vertical
-        tabLayout.Padding=UDim.new(0,compact and COMPACT.TabGap or 8)
-        local searchWidth=compact and math.min(222,math.floor((width-2*COMPACT.Inset)*0.5)) or 222
-        pageHeader.Position=UDim2.fromOffset(contentX,compact and 110 or headerHeight+15)
+        tabLayout.Padding=UDim.new(0,compact and COMPACT.TabGap or 4)
+        local searchWidth=compact and math.min(222,math.floor((width-2*COMPACT.Inset)*0.5)) or 164
+        pageHeader.Position=UDim2.fromOffset(contentX,compact and 110 or headerHeight+6)
         pageHeader.Size=UDim2.new(1,-contentX-rightInset,0,38)
         pageTitle.Size=UDim2.new(1,-searchWidth-12,0,23)
         pageCount.Size=UDim2.new(1,-searchWidth-12,0,14)
-        searchWrap.Size=UDim2.fromOffset(searchWidth,compact and 36 or 34)
+        pageTitle.TextSize=compact and 18 or 15
+        pageCount.Visible=compact
+        searchWrap.Size=UDim2.fromOffset(searchWidth,compact and 36 or 29)
         search.PlaceholderText=compact and "Search..." or "Search controls..."
         local top=compact and COMPACT.ContentTop or STYLE.ContentTop
         content.Position=UDim2.fromOffset(contentX,top)
@@ -451,15 +453,16 @@ function Library:CreateWindow(options)
         local tab={Name=name or "Tab",_order=0,_elements={},_sections={}}
         local labelWidth=TextService:GetTextSize(tostring(tab.Name),15,measureFont,Vector2.new(200,100)).X
         tab._navWidth=math.clamp(math.ceil(labelWidth)+57,104,200)
-        table.insert(self.Tabs,tab); tabCount.Text=tostring(#self.Tabs).." tabs"
+        table.insert(self.Tabs,tab)
         local nav=button(sidebar,{Name=tab.Name,LayoutOrder=#self.Tabs,Size=UDim2.new(1,-2,0,36),BackgroundColor3=C.Row,BackgroundTransparency=0})
         corner(nav,8); local navStroke=stroke(nav,C.Accent,1)
         local navIcon=icon(nav,iconName or "list",C.Muted)
+        new("UIScale",{Scale=1},navIcon)
         local navText=text(nav,tab.Name,15,C.Muted,{Position=UDim2.fromOffset(45,0),Size=UDim2.new(1,-54,1,0),Font=Enum.Font.GothamMedium})
         local indicator=new("Frame",{Position=UDim2.new(0,0,0.5,-8),Size=UDim2.fromOffset(3,16),BackgroundColor3=C.Accent,BorderSizePixel=0,Visible=false},nav)
         corner(indicator,2)
         local page=new("ScrollingFrame",{Name=tab.Name,Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.Accent,ScrollBarImageTransparency=0.5,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=false},content)
-        new("UIListLayout",{Padding=UDim.new(0,7),SortOrder=Enum.SortOrder.LayoutOrder},page)
+        new("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},page)
         new("UIPadding",{PaddingBottom=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingLeft=UDim.new(0,1),PaddingTop=UDim.new(0,1)},page)
         tab._page,tab._nav,tab._text,tab._indicator=page,nav,navText,indicator
         function tab:Select()
@@ -511,17 +514,17 @@ function Library:CreateWindow(options)
             obj.Frame,obj._title,obj._desc=r,title,desc
             function obj:_layout()
                 self._stacked=canStack and compact and rowWidth<500
-                local padding=14+(self._stacked and 14 or reserve)
+                local padding=10+(self._stacked and 10 or reserve)
                 local hasDescription=self._description~=""
                 local minHeight=compact and 46 or STYLE.RowHeight
                 local descHeight=hasDescription and measure(self._description,rowWidth-padding,STYLE.DescriptionFont) or 0
-                local textHeight=hasDescription and math.max(STYLE.DescriptionHeight,29+descHeight+10) or minHeight
+                local textHeight=hasDescription and math.max(STYLE.DescriptionHeight,24+descHeight+7) or minHeight
                 self._height=textHeight+(self._stacked and COMPACT.FieldHeight+8 or 0)
                 local fixedTitle=hasDescription or self._stacked
-                title.Position=UDim2.fromOffset(14,fixedTitle and 8 or 0)
+                title.Position=UDim2.fromOffset(10,fixedTitle and 4 or 0)
                 title.Size=UDim2.new(1,-padding,fixedTitle and 0 or 1,fixedTitle and 19 or 0)
                 desc.Visible=hasDescription
-                desc.Position=UDim2.fromOffset(14,29)
+                desc.Position=UDim2.fromOffset(10,24)
                 desc.Size=UDim2.new(1,-padding,0,descHeight)
                 r.Size=UDim2.new(1,0,0,self._height)
                 if self._afterLayout then self:_afterLayout() end
@@ -569,8 +572,8 @@ function Library:CreateWindow(options)
         end
         function tab:CreateSection(name)
             local section={_name=tostring(name),_visible=true}
-            local frame=new("Frame",{Name="Section",Size=UDim2.new(1,0,0,31),BackgroundTransparency=1},page)
-            local label=text(frame,name,23,C.Text,{Position=UDim2.fromOffset(3,5),Size=UDim2.new(1,-15,1,-5),Font=Enum.Font.GothamBold})
+            local frame=new("Frame",{Name="Section",Size=UDim2.new(1,0,0,25),BackgroundTransparency=1},page)
+            local label=text(frame,name,15,C.Text,{Position=UDim2.fromOffset(3,5),Size=UDim2.new(1,-15,1,-5),Font=Enum.Font.GothamBold})
             order(frame); section.Frame=frame
             function section:Set(value) self._name=tostring(value); label.Text=self._name; refreshSearch() end
             function section:SetVisible(value) self._visible=value==true; refreshSearch() end
@@ -596,15 +599,15 @@ function Library:CreateWindow(options)
             return obj
         end
         function tab:CreateToggle(opts)
-            local obj=row(opts,84)
-            local track=new("Frame",{Name="Track",AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-14,0.5,0),Size=UDim2.fromOffset(53,27),BackgroundColor3=C.Field,BorderSizePixel=0},obj.Frame)
+            local obj=row(opts,61)
+            local track=new("Frame",{Name="Track",AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-14,0.5,0),Size=UDim2.fromOffset(38,20),BackgroundColor3=C.Field,BorderSizePixel=0},obj.Frame)
             corner(track,20)
-            local knob=new("Frame",{Name="Knob",Position=UDim2.fromOffset(4,4),Size=UDim2.fromOffset(19,19),BackgroundColor3=C.Inactive,BorderSizePixel=0},track); corner(knob,20)
+            local knob=new("Frame",{Name="Knob",Position=UDim2.fromOffset(3,3),Size=UDim2.fromOffset(14,14),BackgroundColor3=C.Inactive,BorderSizePixel=0},track); corner(knob,20)
             local hit=button(obj.Frame,{Name="Activate",Size=UDim2.fromScale(1,1)}); obj._hit=hit
             function obj:_paint()
                 local active=self.Value and not self._disabled
                 animate(track,{BackgroundColor3=active and C.Field:Lerp(C.Accent,0.22) or C.Field})
-                animate(knob,{Position=UDim2.fromOffset(self.Value and 30 or 4,4),BackgroundColor3=self._disabled and C.Dim or (self.Value and C.Accent or C.Inactive)})
+                animate(knob,{Position=UDim2.fromOffset(self.Value and 21 or 3,3),BackgroundColor3=self._disabled and C.Dim or (self.Value and C.Accent or C.Inactive)})
             end
             function obj:Set(value,silent) changed(self,opts,value==true,silent); if not window._destroyed then self:_paint() end end
             connect(hit.Activated,function() if obj:_canUse() then obj:Set(not obj.Value) end end)
@@ -616,8 +619,8 @@ function Library:CreateWindow(options)
             assert(finite(low) and finite(high) and high>low,"Slider Range must contain two increasing finite numbers")
             assert(finite(step) and step>0,"Slider Increment must be a positive finite number")
             assert(opts.CurrentValue==nil or finite(opts.CurrentValue),"Slider CurrentValue must be finite")
-            local obj=row(opts,100)
-            local valueField,valueStroke=field(obj.Frame,78,27,23)
+            local obj=row(opts,174)
+            local valueField,valueStroke=field(obj.Frame,68,22,17)
             local box=new("TextBox",{Name="Value",Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",TextColor3=C.Text,TextSize=12,Font=Enum.Font.GothamMedium,ClearTextOnFocus=false},valueField)
             local track=new("Frame",{Name="Track",Position=UDim2.new(0,16,1,-18),Size=UDim2.new(1,-32,0,4),BackgroundColor3=C.Field,BorderSizePixel=0},obj.Frame); corner(track,4)
             local fill=new("Frame",{Size=UDim2.fromScale(0,1),BackgroundColor3=C.Accent,BorderSizePixel=0},track); corner(fill,4)
@@ -625,15 +628,24 @@ function Library:CreateWindow(options)
             local hit=button(obj.Frame,{Name="SliderHit",Position=UDim2.new(0,6,1,-31),Size=UDim2.new(1,-12,0,29)})
             obj._track,obj._knob,obj._box,obj._hit=track,knob,box,hit
             function obj:_afterLayout()
-                local hitHeight=compact and 44 or 32
-                self.Frame.Size=UDim2.new(1,0,0,self._height+hitHeight-5)
-                self._title.Position=UDim2.fromOffset(14,self._description=="" and 11 or 8)
-                self._title.Size=UDim2.new(1,-114,0,19)
-                valueField.Size=UDim2.fromOffset(78,compact and 34 or 27)
-                track.Position=UDim2.new(0,16,1,-math.floor(hitHeight/2)-2)
-                track.Size=UDim2.new(1,-32,0,compact and 6 or 4)
-                hit.Position=UDim2.new(0,6,1,-hitHeight)
-                hit.Size=UDim2.new(1,-12,0,hitHeight)
+                local narrow = compact and rowWidth < 420
+                track.Size = narrow and UDim2.new(1,-32,0,6) or UDim2.fromOffset(94,6)
+                if narrow then
+                    self.Frame.Size = UDim2.new(1,0,0,self._height+39)
+                    self._title.Size = UDim2.new(1,-96,0,19)
+                    self._title.Position = UDim2.fromOffset(10,5)
+                    valueField.Position = UDim2.new(1,-12,0,22)
+                    valueField.Size = UDim2.fromOffset(68,32)
+                    track.Position = UDim2.new(0,16,1,-25)
+                    hit.Position = UDim2.new(0,6,1,-44)
+                    hit.Size = UDim2.new(1,-12,0,44)
+                else
+                    valueField.Position = UDim2.new(1,-12,0.5,0)
+                    valueField.Size = UDim2.fromOffset(49,22)
+                    track.Position = UDim2.new(1,-167,0.5,-3)
+                    hit.Position = UDim2.new(1,-174,0,0)
+                    hit.Size = UDim2.new(0,108,1,0)
+                end
             end
             obj:_afterLayout()
             local function display() box.Text=tostring(obj.Value or low)..(opts.Suffix or "") end
@@ -899,7 +911,7 @@ end)()
 -- Minimal starter. The generated Demo.client.lua includes the library.
 local Window = Library:CreateWindow({
     Name = "0xseanlee UI",
-    Subtitle = "v0.4.0",
+    Subtitle = "v0.5.0",
     Scale = 1,
     ToggleKey = Enum.KeyCode.RightShift,
 })

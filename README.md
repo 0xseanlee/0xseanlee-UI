@@ -2,11 +2,11 @@
 
 Roblox Lua UI 函式庫，提供深色面板、藍紫色強調色、分頁、開關、滑桿、下拉選單、輸入框和快捷鍵。透過設定表建立元件，使用自己的 Callback 接上功能。
 
-目前版本：**v0.4.0**。桌面使用側欄，窄螢幕和可用高度較低的視窗會改成橫向分頁，避免將整個桌面介面縮成小字。手機版也加大了滑桿觸控區，並讓窄欄位移到標題下方。
+目前版本：**v0.5.0**。桌面使用側欄，窄螢幕和可用高度較低的視窗會改成橫向分頁，避免將整個桌面介面縮成小字。手機版也加大了滑桿觸控區，並讓窄欄位移到標題下方。
 
 ## 1. 載入空白 UI
 
-v0.4.0 可直接使用隨附的 [Demo.client.lua](Demo.client.lua)，或在 Roblox Studio 中按照第 6 節使用本機的 [Library.lua](Library.lua)。
+v0.5.0 可直接使用隨附的 [Demo.client.lua](Demo.client.lua)，或在 Roblox Studio 中按照第 6 節使用本機的 [Library.lua](Library.lua)。
 
 下列範例載入 GitHub 的 `main`：
 
@@ -41,7 +41,7 @@ local Window = UI:CreateWindow({
     Subtitle = "My Script",
     Scale = 1,
     ToggleKey = Enum.KeyCode.RightShift,
-    AccentColor = Color3.fromRGB(88, 101, 242),
+    AccentColor = Color3.fromRGB(113, 106, 230),
     ReducedMotion = false,
 })
 
@@ -59,11 +59,11 @@ Main:CreateButton({
 
 `Library.lua` 回傳函式庫 table；`CreateWindow` 回傳視窗，`CreateTab` 回傳分頁，各個 `Create...` 方法回傳可更新的元件物件。
 
-若要固定在v0.4.0，可用以下網址：
+若要固定在v0.5.0，可用以下網址：
 
 ```lua
 local UI = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/v0.4.0/Library.lua"
+    "https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/v0.5.0/Library.lua"
 ))()
 ```
 
