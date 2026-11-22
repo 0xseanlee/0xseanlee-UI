@@ -261,6 +261,48 @@ local Library = assert(load(source, "@Library.lua"))()
 local current = Library:MakeWindow({Title = "Current API"})
 local currentTab = current:MakeTab({"Current", "home"})
 check(currentTab:AddButton({Name = "Current button"}).Frame, "Native control still works")
+local settings = current:MakeTab({"settings"})
+check(settings == current.SettingsTab and currentTab.Cont.Parent, "Settings is fixed and first app tab stays selected")
+local function clickSetting(name)
+    for _, label in ipairs(settings.Cont:GetDescendants()) do
+        if label:IsA("TextLabel") and label.Text == name then
+            label.Parent.Parent.Activated:Fire()
+            return
+        end
+    end
+    error("Missing setting: " .. name)
+end
+local nativeGui = current.Root.Parent
+local medium = nativeGui.Scale.Scale
+clickSetting("Small")
+check(nativeGui.Scale.Scale < medium, "Small reduces visible size")
+clickSetting("Large")
+check(nativeGui.Scale.Scale > medium, "Large increases visible size")
+clickSetting("Red · Redz")
+local accent = Library.Themes.Red["Color Theme"]
+check(Library.Save.Theme == "Red" and currentTab.Cont.ScrollBarImageColor3 == accent, "Settings repaints existing controls")
+clickSetting("Blue · 0xseanlee")
+check(currentTab.Cont.ScrollBarImageColor3 == Library.Themes.Blue["Color Theme"])
+clickSetting("Medium")
+
+local header = current.Root:FindFirstChild("Top Bar", true)
+current.Root.AbsoluteSize = Vector2.new(550 * medium, 380 * medium)
+local initial = current.Root.Position
+local touch = {UserInputType = Enum.UserInputType.Touch, Position = Vector3.new(120, 120, 0)}
+local other = {UserInputType = Enum.UserInputType.Touch, Position = Vector3.new(200, 150, 0)}
+header.InputBegan:Fire(touch)
+header.InputBegan:Fire(other)
+input.InputChanged:Fire(other)
+check(current.Root.Position == initial, "Second touch cannot move window")
+touch.Position = Vector3.new(160, 144, 0)
+input.InputChanged:Fire(touch)
+check(math.abs(current.Root.Position.X.Offset - initial.X.Offset - 40/medium) < 0.01, "Drag follows the finger at rendered scale")
+input.InputEnded:Fire(touch)
+local after = current.Root.Position
+touch.Position = Vector3.new(250, 170, 0)
+input.InputChanged:Fire(touch)
+check(current.Root.Position == after, "Released touch stops moving the window")
+
 current.Root.Parent:Destroy()
 
 local window = Library:CreateWindow({ReducedMotion = true})
@@ -321,4 +363,4 @@ replacement:Destroy()
 local nativeAgain = Library:MakeWindow({Title = "Native again"})
 check(nativeAgain:MakeTab({"Again", "home"}))
 nativeAgain.Root.Parent:Destroy()
-print("PASS: both APIs, flags, callbacks, dropdown refresh, input, keybind, filtering, remount")
+print("PASS: settings, theme, drag, both APIs, callbacks, dropdown refresh, keybind, remount")

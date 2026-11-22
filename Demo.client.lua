@@ -4,7 +4,6 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -889,6 +888,18 @@ local redzlib = {
 	end)()
 }
 
+for name, accent in pairs({
+	Red = Color3.fromRGB(227, 67, 77),
+	Blue = Color3.fromRGB(88, 101, 242),
+}) do
+	local palette = {}
+	for key, value in pairs(redzlib.Themes.Darker) do palette[key] = value end
+	palette["Color Theme"] = accent
+	redzlib.Themes[name] = palette
+end
+local SIZE_PRESETS = {Small = 0.67, Medium = 0.83, Large = 1}
+local sizePreset = "Medium"
+
 local ViewportSize = workspace.CurrentCamera.ViewportSize
 local UIScale = ViewportSize.Y / 450
 
@@ -1149,41 +1160,56 @@ local function CreateTween(Configs)
 	return Tween
 end
 
-local function MakeDrag(Instance)
-	task.spawn(function()
-		SetProps(Instance, {
-			Active = true,
-			AutoButtonColor = false
-		})
+local function MakeDrag(target, handle, rightPadding)
+	handle = handle or target
+	handle.Active = true
+	if handle:IsA("GuiButton") then handle.AutoButtonColor = false end
 
-		local DragStart, StartPos, InputOn
-
-		local function Update(Input)
-			local delta = Input.Position - DragStart
-			local Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + delta.X / UIScale, StartPos.Y.Scale, StartPos.Y.Offset + delta.Y / UIScale)
-			-- Instance.Position = Position
-			CreateTween({Instance, "Position", Position, 0.35})
-		end
-
-		Instance.MouseButton1Down:Connect(function()
-			InputOn = true
-		end)
-
-		Instance.InputBegan:Connect(function(Input)
-			if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-				StartPos = Instance.Position
-				DragStart = Input.Position
-
-				while UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do RunService.Heartbeat:Wait()
-					if InputOn then
-						Update(Input)
-					end
-				end
-				InputOn = false
-			end
-		end)
+	local owner, startPointer, startPosition, startAbsolute, scale
+	local moved = false
+	local function finish()
+		if not owner then return end
+		owner = nil
+	end
+	handle.InputBegan:Connect(function(input)
+		local kind = input.UserInputType
+		if owner or (kind ~= Enum.UserInputType.Touch and kind ~= Enum.UserInputType.MouseButton1) then return end
+		if rightPadding and input.Position.X >= handle.AbsolutePosition.X + handle.AbsoluteSize.X - rightPadding * UIScale then return end
+		owner = input
+		startPointer, startPosition = input.Position, target.Position
+		startAbsolute = target.AbsolutePosition
+		scale, moved = math.max(0.001, UIScale), false
 	end)
-	return Instance
+
+	local changed = UserInputService.InputChanged:Connect(function(input)
+		if not owner then return end
+		local mouse = owner.UserInputType == Enum.UserInputType.MouseButton1
+		if (mouse and input.UserInputType ~= Enum.UserInputType.MouseMovement) or (not mouse and input ~= owner) then return end
+		local dx, dy = input.Position.X - startPointer.X, input.Position.Y - startPointer.Y
+		if not moved and math.abs(dx) + math.abs(dy) < 4 then return end
+		moved = true
+		local parent = target.Parent
+		if parent and parent:IsA("ScreenGui") then
+			local available, dimensions = parent.AbsoluteSize, target.AbsoluteSize
+			local origin = parent.AbsolutePosition
+			local x, y = startAbsolute.X - origin.X, startAbsolute.Y - origin.Y
+			dx = math.clamp(x + dx, 0, math.max(0, available.X - dimensions.X)) - x
+			dy = math.clamp(y + dy, 0, math.max(0, available.Y - dimensions.Y)) - y
+		end
+		target.Position = UDim2.new(startPosition.X.Scale, startPosition.X.Offset + dx / scale,
+			startPosition.Y.Scale, startPosition.Y.Offset + dy / scale)
+	end)
+	local ended = UserInputService.InputEnded:Connect(function(input)
+		if owner and (input == owner or (owner.UserInputType == Enum.UserInputType.MouseButton1
+			and input.UserInputType == Enum.UserInputType.MouseButton1)) then finish() end
+	end)
+	local lostFocus = UserInputService.WindowFocusReleased:Connect(finish)
+	target.Destroying:Connect(function()
+		changed:Disconnect()
+		ended:Disconnect()
+		lostFocus:Disconnect()
+	end)
+	return target, function() return moved end
 end
 
 local function VerifyTheme(Theme)
@@ -1340,11 +1366,11 @@ local function ButtonFrame(Instance, Title, Description, HolderSize)
 end
 
 local function GetColor(Instance)
-	if Instance:IsA("Frame") then
+	if Instance:IsA("Frame") or Instance:IsA("TextButton") or Instance:IsA("ImageButton") then
 		return "BackgroundColor3"
 	elseif Instance:IsA("ImageLabel") then
 		return "ImageColor3"
-	elseif Instance:IsA("TextLabel") then
+	elseif Instance:IsA("TextLabel") or Instance:IsA("TextBox") then
 		return "TextColor3"
 	elseif Instance:IsA("ScrollingFrame") then
 		return "ScrollBarImageColor3"
@@ -1378,14 +1404,14 @@ function redzlib:GetIcon(index)
 	return firstMatch or index
 end
 
-function redzlib:SetTheme(NewTheme)
+function redzlib:SetTheme(NewTheme, persist)
 	if not VerifyTheme(NewTheme) then return end
 
 	redzlib.Save.Theme = NewTheme
-	SaveJson("redz library V5.json", redzlib.Save)
+	if persist ~= false then SaveJson("redz library V5.json", redzlib.Save) end
 	Theme = redzlib.Themes[NewTheme]
 
-	Comnection:FireConnection("ThemeChanged", NewTheme)
+	Connection:FireConnection("ThemeChanged", NewTheme)
 	table.foreach(redzlib.Instances, function(_,Val)
 		if Val.Type == "Gradient" then
 			Val.Instance.Color = Theme["Color Hub 1"]
@@ -1442,7 +1468,7 @@ function redzlib:MakeWindow(Configs)
 	}), "Main")
 	Make("Gradient", MainFrame, {
 		Rotation = 45
-	})MakeDrag(MainFrame)
+	})
 
 	local MainCorner = Make("Corner", MainFrame)
 
@@ -1459,6 +1485,8 @@ function redzlib:MakeWindow(Configs)
 		BackgroundTransparency = 1,
 		Name = "Top Bar"
 	})
+
+	MakeDrag(MainFrame, TopBar, 50)
 
 	local Title = InsertTheme(Create("TextLabel", TopBar, {
 		Position = UDim2.new(0, 15, 0.5),
@@ -1508,6 +1536,7 @@ function redzlib:MakeWindow(Configs)
 			PaddingTop = UDim.new(0, 10),
 			PaddingBottom = UDim.new(0, 10)
 		}), Create("UIListLayout", {
+			SortOrder = "LayoutOrder",
 			Padding = UDim.new(0, 5)
 		})
 	}), "ScrollBar")
@@ -1589,6 +1618,25 @@ function redzlib:MakeWindow(Configs)
 
 	local Minimized, SaveSize, WaitClick
 	local Window, FirstTab = {}, false
+	local settingsTab, hasAppTab
+	local presetActive = true
+	local gui = ScreenGui
+	local function fitPreset()
+		if not presetActive then return end
+		local available = gui.AbsoluteSize
+		if available.X <= 20 or available.Y <= 20 then return end
+		local size = MainFrame.Size
+		local maxScale = math.min(1.2, (available.X - 20) / size.X.Offset, (available.Y - 20) / size.Y.Offset)
+		UIScale = maxScale * SIZE_PRESETS[sizePreset]
+		gui.Scale.Scale = UIScale
+	end
+	function Window:_setPresetActive(active)
+		presetActive, self._presetActive = active, active
+		if active then fitPreset() end
+	end
+	local viewportConnection = gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitPreset)
+	MainFrame.Destroying:Connect(function() viewportConnection:Disconnect() end)
+	Window:_setPresetActive(true)
 	Window.Root = MainFrame
 	function Window:CloseBtn()
 		local Dialog = Window:Dialog({
@@ -1627,7 +1675,7 @@ function redzlib:MakeWindow(Configs)
 		MainFrame.Visible = not MainFrame.Visible
 	end
 	function Window:AddMinimizeButton(Configs)
-		local Button = MakeDrag(Create("ImageButton", ScreenGui, {
+		local Button, dragged = MakeDrag(Create("ImageButton", ScreenGui, {
 			Size = UDim2.fromOffset(35, 35),
 			Position = UDim2.fromScale(0.15, 0.15),
 			BackgroundTransparency = 1,
@@ -1646,7 +1694,7 @@ function redzlib:MakeWindow(Configs)
 		end
 
 		SetProps(Button, Configs.Button)
-		Button.Activated:Connect(Window.Minimize)
+		Button.Activated:Connect(function() if not dragged() then Window:Minimize() end end)
 
 		return {
 			Stroke = Stroke,
@@ -1783,6 +1831,7 @@ function redzlib:MakeWindow(Configs)
 		if type(paste) == "table" then Configs = paste end
 		local TName = Configs[1] or Configs.Title or "Tab!"
 		local TIcon = Configs[2] or Configs.Icon or ""
+		if settingsTab and string.lower(tostring(TName)) == "settings" then return settingsTab end
 
 		TIcon = redzlib:GetIcon(TIcon)
 		if not TIcon:find("rbxassetid://") or TIcon:gsub("rbxassetid://", ""):len() < 6 then
@@ -1792,6 +1841,7 @@ function redzlib:MakeWindow(Configs)
 		local TabSelect = Make("Button", MainScroll, {
 			Size = UDim2.new(1, 0, 0, 24)
 		})Make("Corner", TabSelect)
+		TabSelect.LayoutOrder = #ContainerList + 1
 
 		local LabelTitle = InsertTheme(Create("TextLabel", TabSelect, {
 			Size = UDim2.new(1, TIcon and -25 or -15, 1),
@@ -1878,6 +1928,7 @@ function redzlib:MakeWindow(Configs)
 		table.insert(redzlib.Tabs, {TabInfo = {Name = TName, Icon = TIcon}, func = Tab, Cont = Container})
 		Tab.Cont = Container
 		Tab._selectSignal = TabSelect.Activated
+		Tab._navigation = TabSelect
 
 		function Tab:Disable()
 			Container.Parent = nil
@@ -2722,7 +2773,33 @@ function redzlib:MakeWindow(Configs)
 			function DiscordInvite:Visible(...) Funcs:ToggleVisible(InviteHolder, ...) end
 			return DiscordInvite
 		end
+		if settingsTab and not hasAppTab then
+			hasAppTab = true
+			Tab:Enable()
+		end
 		return Tab
+	end
+
+	settingsTab = Window:MakeTab({"Settings", "settings"})
+	settingsTab._navigation.LayoutOrder = 1000000
+	Window.SettingsTab = settingsTab
+	settingsTab:AddSection("UI Size")
+	local sizeStatus = settingsTab:AddParagraph({Title = "Current size", Text = sizePreset})
+	for _, name in ipairs({"Small", "Medium", "Large"}) do
+		settingsTab:AddButton({Name = name, Callback = function()
+			sizePreset = name
+			Window:_setPresetActive(true)
+			MainFrame.Position = UDim2.new(0.5, -MainFrame.Size.X.Offset / 2, 0.5, -MainFrame.Size.Y.Offset / 2)
+			sizeStatus:SetDesc(name)
+		end})
+	end
+	settingsTab:AddSection("Color Theme")
+	local themeStatus = settingsTab:AddParagraph({Title = "Current theme", Text = redzlib.Save.Theme == "Darker" and "Blue" or redzlib.Save.Theme})
+	for _, option in ipairs({{"Red · Redz", "Red"}, {"Blue · 0xseanlee", "Blue"}}) do
+		settingsTab:AddButton({Name = option[1], Callback = function()
+			redzlib:SetTheme(option[2], false)
+			themeStatus:SetDesc(option[2])
+		end})
 	end
 
 	CloseButton.Activated:Connect(Window.CloseBtn)
@@ -2769,6 +2846,7 @@ function redzlib:CreateWindow(options)
 	local connections, controls, bindings = {}, {}, {}
 	local destroyed, query, capture = false, "", nil
 	local requestedScale = options.Scale or 1
+	if options.Scale then native:_setPresetActive(false) end
 
 	local function connect(signal, fn)
 		connections[#connections + 1] = signal:Connect(fn)
@@ -2802,6 +2880,7 @@ function redzlib:CreateWindow(options)
 		if capture and not capture:_canUse() then cancelCapture() end
 	end
 	local function fit()
+		if native._presetActive ~= false then return end
 		local size, root = gui.AbsoluteSize, native.Root.Size
 		if size.X <= 20 or size.Y <= 20 then return end
 		UIScale = math.min(requestedScale, (size.X - 20) / math.max(1, root.X.Offset), (size.Y - 20) / math.max(1, root.Y.Offset))
@@ -2816,6 +2895,7 @@ function redzlib:CreateWindow(options)
 	function window:SetScale(value)
 		if not finite(value) or value <= 0 then return false end
 		requestedScale = value
+		native:_setPresetActive(false)
 		fit()
 		return true
 	end
@@ -2862,7 +2942,7 @@ function redzlib:CreateWindow(options)
 		for _, conn in ipairs(connections) do conn:Disconnect() end
 		if legacyWindow == window then
 			legacyWindow = nil
-			Theme = previousTheme
+			Theme = redzlib.Themes[redzlib.Save.Theme] or previousTheme
 			reducedMotion = false
 			table.clear(redzlib.Tabs)
 			table.clear(redzlib.Options)
@@ -2898,12 +2978,15 @@ function redzlib:CreateWindow(options)
 		if launcher.Visible then cancelCapture() end
 	end)
 
+	local legacyTabs = {}
 	function window:CreateTab(name, icon)
 		if type(name) == "table" then name, icon = name.Name, name.Icon end
 		local tab = {Name = name or "Tab", _controls = {}, _sections = {}}
 		local nativeTab = native:MakeTab({tab.Name, icon or "list"})
+		if legacyTabs[nativeTab] then return legacyTabs[nativeTab] end
+		legacyTabs[nativeTab] = tab
 		table.insert(self.Tabs, tab)
-		if not self.SelectedTab then self.SelectedTab = tab end
+		if not self.SelectedTab or nativeTab.Cont.Parent then self.SelectedTab = tab end
 		local function selected()
 			if window.SelectedTab ~= tab then closeDropdowns() end
 			window.SelectedTab = tab
@@ -2941,7 +3024,7 @@ function redzlib:CreateWindow(options)
 			}
 			function obj:_canUse()
 				return not destroyed and not self._disabled and self.Frame and self.Frame.Visible
-					and tab == window.SelectedTab and native.Root.Visible
+					and nativeTab.Cont.Parent ~= nil and tab == window.SelectedTab and native.Root.Visible
 			end
 			function obj:_change(value, silent)
 				local changed = value ~= self.Value
