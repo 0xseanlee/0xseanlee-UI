@@ -1,6 +1,6 @@
 -- 0xseanlee UI: paste this entire file into your Lua executor.
 local Library = (function()
--- 0xseanlee UI v0.3.1 | Standalone, independently implemented Roblox UI.
+-- 0xseanlee UI v0.4.0 | Standalone, independently implemented Roblox UI.
 -- No remote assets, network requests, or telemetry.
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -9,18 +9,18 @@ local TextService = game:GetService("TextService")
 local Library = {}
 local activeWindow
 local BASE = {
-    Background = Color3.fromRGB(17, 17, 17), Sidebar = Color3.fromRGB(18, 18, 18),
-    Row = Color3.fromRGB(28, 28, 30), Hover = Color3.fromRGB(35, 35, 38),
-    Field = Color3.fromRGB(45, 45, 45), Border = Color3.fromRGB(47, 47, 50),
+    Sidebar = Color3.fromRGB(20, 21, 25),
+    Row = Color3.fromRGB(28, 29, 35), Hover = Color3.fromRGB(37, 39, 48),
+    Field = Color3.fromRGB(42, 44, 54), Border = Color3.fromRGB(62, 64, 77),
     Text = Color3.fromRGB(250, 250, 250), Muted = Color3.fromRGB(200, 200, 200),
-    Dim = Color3.fromRGB(125, 125, 132), Accent = Color3.fromRGB(88, 101, 242),
+    Dim = Color3.fromRGB(145, 147, 163), Accent = Color3.fromRGB(88, 101, 242),
     Inactive = Color3.fromRGB(61, 67, 135),
 }
--- Metrics calibrated from both supplied appearance snapshots, normalized by 1.5.
--- Search, focus management and all callbacks remain 0xseanlee UI implementations.
+-- Keep the original desktop dimensions while reflowing the controls on small viewports.
 local STYLE = {Width=825, Height=570, Sidebar=240, Header=42, ContentX=255,
     ContentTop=105, CardRadius=9, RowHeight=38, DescriptionHeight=54,
     ControlFont=16, DescriptionFont=12, FieldWidth=225, FieldHeight=27}
+local COMPACT = {Inset=12, Header=48, TabHeight=42, TabGap=7, ContentTop=155, FieldHeight=38}
 local FONTS={}
 local measureFont=Enum.Font.Gotham
 pcall(function()
@@ -32,6 +32,9 @@ pcall(function()
 end)
 local function finite(value)
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+local function pointerBegan(input)
+    return input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch
 end
 local function keycode(value)
     if type(value)=="string" then
@@ -134,7 +137,7 @@ function Library:CreateWindow(options)
     local C={}
     for key,value in pairs(BASE) do C[key]=value end
     C.Accent=options.AccentColor or C.Accent
-    C.Selected=C.Row:Lerp(C.Accent,0.07)
+    C.Selected=C.Row:Lerp(C.Accent,0.16)
     local window={Tabs={},Values={},_controls={},_keybinds={},_connections={},_destroyed=false,_scale=options.Scale or 1,_query="",_reducedMotion=options.ReducedMotion==true}
     activeWindow=window
     local function connect(signal,fn,scope)
@@ -160,57 +163,48 @@ function Library:CreateWindow(options)
     if not mounted then mounted=pcall(function() gui.Parent=game:GetService("CoreGui") end) end
     if not mounted then gui.Parent=Players.LocalPlayer:WaitForChild("PlayerGui") end
     window.Gui=gui
-    local W,H=STYLE.Width,STYLE.Height
-    local ROW_WIDTH=W-STYLE.ContentX-24
-    local root=new("Frame",{Name="Window",AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),Size=UDim2.fromOffset(W,H),BackgroundColor3=C.Background,BorderSizePixel=0,ClipsDescendants=true,Active=true},gui)
+    local width,height=STYLE.Width,STYLE.Height
+    local rowWidth=width-STYLE.ContentX-24
+    local compact=false
+    local root=new("Frame",{Name="Window",AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),Size=UDim2.fromOffset(width,height),BackgroundColor3=Color3.new(1,1,1),BackgroundTransparency=0.03,BorderSizePixel=0,ClipsDescendants=true,Active=true},gui)
     corner(root,12); stroke(root,C.Border,0.65)
-    root.BackgroundColor3=Color3.new(1,1,1)
-    root.BackgroundTransparency=0.03
     new("UIGradient",{Rotation=90,Color=ColorSequence.new({
-        ColorSequenceKeypoint.new(0,Color3.fromRGB(16,16,16)),
-        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(21,21,21)),
-        ColorSequenceKeypoint.new(1,Color3.fromRGB(16,16,16)),
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(16,17,21)),
+        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(23,24,30)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(17,18,22)),
     })},root)
     window.Root=root
     local scaler=new("UIScale",{Scale=1},root)
     local function clampPosition()
+        if root.Position.X.Scale==0.5 and root.Position.Y.Scale==0.5 then return end
         local viewport=gui.AbsoluteSize
-        local halfW,halfH=W*scaler.Scale/2,H*scaler.Scale/2
+        local halfW,halfH=width*scaler.Scale/2,height*scaler.Scale/2
         local x=root.Position.X.Scale*viewport.X+root.Position.X.Offset
         local y=root.Position.Y.Scale*viewport.Y+root.Position.Y.Offset
-        root.Position=UDim2.fromOffset(math.clamp(x,halfW+8,math.max(halfW+8,viewport.X-halfW-8)),math.clamp(y,halfH+8,math.max(halfH+8,viewport.Y-halfH-8)))
+        local minX=math.min(halfW+8,viewport.X/2)
+        local minY=math.min(halfH+8,viewport.Y/2)
+        root.Position=UDim2.fromOffset(math.clamp(x,minX,viewport.X-minX),math.clamp(y,minY,viewport.Y-minY))
     end
     local toastHost=new("Frame",{Name="Notifications",AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-18,1,-18),Size=UDim2.fromOffset(360,250),BackgroundTransparency=1,ZIndex=50},gui)
     new("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Bottom},toastHost)
-    local function fit()
-        local size=gui.AbsoluteSize
-        if size.X<=0 or size.Y<=0 then return end
-        scaler.Scale=math.max(0.001,math.min(window._scale,math.max(1,size.X-20)/W,math.max(1,size.Y-20)/H))
-        toastHost.Size=UDim2.fromOffset(math.max(1,math.min(360,size.X-36)),250)
-        clampPosition()
-    end
-    connect(gui:GetPropertyChangedSignal("AbsoluteSize"),fit)
-    function window:SetScale(value)
-        if not finite(value) or value<=0 then return false end
-        self._scale=value; fit(); return true
-    end
-    function window:ResetPosition() root.Position=UDim2.fromScale(0.5,0.5); fit() end
     function window:SetReducedMotion(value) self._reducedMotion=value==true end
-    fit()
     local header=button(root,{Name="Header",Size=UDim2.new(1,-95,0,STYLE.Header)})
-    local heading=text(header,options.Name or "0xseanlee UI",18,C.Text,{Position=UDim2.fromOffset(20,0),Size=UDim2.new(0.6,-20,1,0),Font=Enum.Font.GothamBold})
+    local headerMark=new("Frame",{Name="BrandMark",Position=UDim2.new(0,15,0.5,-8),Size=UDim2.fromOffset(4,16),BackgroundColor3=C.Accent,BorderSizePixel=0},header)
+    corner(headerMark,2)
+    local heading=text(header,options.Name or "0xseanlee UI",18,C.Text,{Position=UDim2.fromOffset(28,0),Size=UDim2.new(0.6,-28,1,0),Font=Enum.Font.GothamBold})
     local subtitle=text(header,options.Subtitle or "Your workspace",11,C.Muted,{Position=UDim2.fromScale(0.62,0),Size=UDim2.fromScale(0.36,1)})
-    local function headerButton(x,close)
-        local b=button(root,{Position=UDim2.new(1,x,0,5),Size=UDim2.fromOffset(32,32),BackgroundColor3=C.Field})
+    local function headerButton(name,close)
+        local b=button(root,{Name=name,AnchorPoint=Vector2.new(1,0),BackgroundColor3=C.Field})
         corner(b,8)
-        if close then line(b,11,11,21,21,C.Muted); line(b,21,11,11,21,C.Muted)
-        else line(b,10,16,22,16,C.Muted) end
+        local symbol=new("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),Size=UDim2.fromOffset(16,16),BackgroundTransparency=1},b)
+        if close then line(symbol,3,3,13,13,C.Muted); line(symbol,13,3,3,13,C.Muted)
+        else line(symbol,2,8,14,8,C.Muted) end
         connect(b.MouseEnter,function() animate(b,{BackgroundTransparency=0}) end)
         connect(b.MouseLeave,function() animate(b,{BackgroundTransparency=1}) end)
         return b
     end
-    local minimize,close=headerButton(-85,false),headerButton(-46,true)
-    local restore=button(gui,{Name="Restore",Text="V",Font=Enum.Font.GothamBold,TextSize=18,TextColor3=C.Accent,BackgroundTransparency=0,BackgroundColor3=C.Sidebar,Position=UDim2.fromOffset(18,100),Size=UDim2.fromOffset(44,44),Visible=false})
+    local minimize,close=headerButton("Minimize",false),headerButton("Close",true)
+    local restore=button(gui,{Name="Restore",Text="0x",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=C.Text,BackgroundTransparency=0,BackgroundColor3=C.Sidebar,Position=UDim2.fromOffset(14,100),Size=UDim2.fromOffset(48,48),Visible=false})
     corner(restore,13); stroke(restore,C.Accent,0.55)
     local function cancelInteraction()
         if window._drag and window._drag.Finish then window._drag.Finish() end
@@ -271,10 +265,10 @@ function Library:CreateWindow(options)
     -- Navigation stays independent of the scrollable page.
     local rail=new("Frame",{Name="Navigation",Position=UDim2.fromOffset(0,STYLE.Header),Size=UDim2.new(0,STYLE.Sidebar,1,-STYLE.Header),BackgroundColor3=C.Sidebar,BackgroundTransparency=0.35,BorderSizePixel=0},root)
     local sidebar=new("ScrollingFrame",{Name="Sidebar",Position=UDim2.fromOffset(15,15),Size=UDim2.new(1,-30,1,-68),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=2,ScrollBarImageColor3=C.Accent,ScrollBarImageTransparency=0.75,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y},rail)
-    new("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
-    new("Frame",{Position=UDim2.fromOffset(STYLE.Sidebar,STYLE.Header+15),Size=UDim2.new(0,1,1,-STYLE.Header-30),BackgroundColor3=C.Accent,BackgroundTransparency=0.72,BorderSizePixel=0},root)
+    local tabLayout=new("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
+    local divider=new("Frame",{Name="Divider",BackgroundColor3=C.Border,BackgroundTransparency=0.3,BorderSizePixel=0},root)
     local tabCount=text(rail,"0 tabs",11,C.Dim,{Position=UDim2.new(0,18,1,-44),Size=UDim2.new(1,-36,0,16)})
-    text(rail,toggleKey.Name.."  to hide",10,C.Muted,{Position=UDim2.new(0,18,1,-26),Size=UDim2.new(1,-36,0,16)})
+    local shortcut=text(rail,toggleKey.Name.."  to hide",10,C.Muted,{Position=UDim2.new(0,18,1,-26),Size=UDim2.new(1,-36,0,16)})
     local pageHeader=new("Frame",{Position=UDim2.fromOffset(STYLE.ContentX,STYLE.Header+15),Size=UDim2.new(1,-STYLE.ContentX-15,0,38),BackgroundTransparency=1},root)
     local pageTitle=text(pageHeader,"",18,C.Text,{Size=UDim2.new(0.5,-10,0,23),Font=Enum.Font.GothamBold})
     local pageCount=text(pageHeader,"",10,C.Muted,{Position=UDim2.fromOffset(0,24),Size=UDim2.new(0.5,-10,0,14)})
@@ -286,6 +280,123 @@ function Library:CreateWindow(options)
     line(clear,9,9,15,15,C.Muted); line(clear,15,9,9,15,C.Muted)
     local content=new("Frame",{Name="Content",Position=UDim2.fromOffset(STYLE.ContentX,STYLE.ContentTop),Size=UDim2.new(1,-STYLE.ContentX-15,1,-STYLE.ContentTop-15),BackgroundTransparency=1},root)
     local empty=text(content,"No matching controls",14,C.Muted,{TextXAlignment=Enum.TextXAlignment.Center,Visible=false})
+    local function layoutTab(tab)
+        if compact then
+            tab._nav.Size=UDim2.fromOffset(tab._navWidth,COMPACT.TabHeight)
+            tab._indicator.AnchorPoint=Vector2.new(0.5,1)
+            tab._indicator.Position=UDim2.new(0.5,0,1,-2)
+            tab._indicator.Size=UDim2.fromOffset(24,2)
+        else
+            tab._nav.Size=UDim2.new(1,-2,0,36)
+            tab._indicator.AnchorPoint=Vector2.new(0,0.5)
+            tab._indicator.Position=UDim2.fromScale(0,0.5)
+            tab._indicator.Size=UDim2.fromOffset(3,16)
+        end
+        tab._icon.Position=UDim2.fromOffset(12,compact and 10 or 7)
+    end
+    local function revealTab()
+        if not compact or not window.SelectedTab then return end
+        local selected=window.SelectedTab
+        task.defer(function()
+            if window._destroyed or not compact or window.SelectedTab~=selected then return end
+            local left=0
+            for _,tab in ipairs(window.Tabs) do
+                if tab==selected then break end
+                left=left+tab._navWidth+COMPACT.TabGap
+            end
+            local visibleWidth=width-2*COMPACT.Inset
+            local right=left+selected._navWidth-visibleWidth
+            local canvasX=sidebar.CanvasPosition.X
+            if canvasX>left then canvasX=left elseif canvasX<right then canvasX=right end
+            sidebar.CanvasPosition=Vector2.new(canvasX,0)
+        end)
+    end
+    local function layoutWindow()
+        local headerHeight=compact and COMPACT.Header or STYLE.Header
+        local contentX=compact and COMPACT.Inset or STYLE.ContentX
+        local rightInset=compact and COMPACT.Inset or 15
+        local showsSubtitle=not compact or width>=440
+        local buttonSize=compact and 42 or 38
+        header.Size=UDim2.new(1,compact and -104 or -100,0,headerHeight)
+        heading.Size=showsSubtitle and UDim2.new(0.6,-28,1,0) or UDim2.new(1,-36,1,0)
+        subtitle.Visible=showsSubtitle
+        minimize.Size=UDim2.fromOffset(buttonSize,buttonSize)
+        close.Size=UDim2.fromOffset(buttonSize,buttonSize)
+        minimize.Position=UDim2.new(1,-53,0,(headerHeight-buttonSize)/2)
+        close.Position=UDim2.new(1,-8,0,(headerHeight-buttonSize)/2)
+        tabCount.Visible=not compact
+        shortcut.Visible=not compact
+        if compact then
+            rail.Position=UDim2.fromOffset(0,headerHeight)
+            rail.Size=UDim2.new(1,0,0,53)
+            sidebar.Position=UDim2.fromOffset(COMPACT.Inset,4)
+            sidebar.Size=UDim2.new(1,-2*COMPACT.Inset,0,47)
+            divider.Position=UDim2.new(0,COMPACT.Inset,0,102)
+            divider.Size=UDim2.new(1,-2*COMPACT.Inset,0,1)
+        else
+            rail.Position=UDim2.fromOffset(0,headerHeight)
+            rail.Size=UDim2.new(0,STYLE.Sidebar,1,-headerHeight)
+            sidebar.Position=UDim2.fromOffset(15,15)
+            sidebar.Size=UDim2.new(1,-30,1,-68)
+            divider.Position=UDim2.fromOffset(STYLE.Sidebar,headerHeight+15)
+            divider.Size=UDim2.new(0,1,1,-headerHeight-30)
+        end
+        sidebar.AutomaticCanvasSize=compact and Enum.AutomaticSize.X or Enum.AutomaticSize.Y
+        sidebar.ScrollingDirection=compact and Enum.ScrollingDirection.X or Enum.ScrollingDirection.Y
+        tabLayout.FillDirection=compact and Enum.FillDirection.Horizontal or Enum.FillDirection.Vertical
+        tabLayout.Padding=UDim.new(0,compact and COMPACT.TabGap or 8)
+        local searchWidth=compact and math.min(222,math.floor((width-2*COMPACT.Inset)*0.5)) or 222
+        pageHeader.Position=UDim2.fromOffset(contentX,compact and 110 or headerHeight+15)
+        pageHeader.Size=UDim2.new(1,-contentX-rightInset,0,38)
+        pageTitle.Size=UDim2.new(1,-searchWidth-12,0,23)
+        pageCount.Size=UDim2.new(1,-searchWidth-12,0,14)
+        searchWrap.Size=UDim2.fromOffset(searchWidth,compact and 36 or 34)
+        search.PlaceholderText=compact and "Search..." or "Search controls..."
+        local top=compact and COMPACT.ContentTop or STYLE.ContentTop
+        content.Position=UDim2.fromOffset(contentX,top)
+        content.Size=UDim2.new(1,-contentX-rightInset,1,-top-rightInset)
+        rowWidth=width-contentX-rightInset-9
+        for _,tab in ipairs(window.Tabs) do layoutTab(tab) end
+        for _,control in ipairs(window._controls) do control:_layout() end
+        revealTab()
+    end
+    local function fit()
+        local viewport=gui.AbsoluteSize
+        if viewport.X<=0 or viewport.Y<=0 then return end
+        local availableW,availableH=math.max(1,viewport.X-20),math.max(1,viewport.Y-20)
+        local desktopScale=math.min(availableW/STYLE.Width,availableH/STYLE.Height)
+        local nextCompact=desktopScale<math.min(window._scale,1)*0.9
+        local scale=math.min(window._scale,desktopScale)
+        local nextWidth,nextHeight=STYLE.Width,STYLE.Height
+        if nextCompact then
+            scale=math.min(window._scale,availableW/320,availableH/260)
+            nextWidth=math.min(STYLE.Width,math.floor(availableW/scale))
+            nextHeight=math.min(STYLE.Height,math.floor(availableH/scale))
+        end
+        scaler.Scale=scale
+        root.Size=UDim2.fromOffset(nextWidth,nextHeight)
+        toastHost.Size=UDim2.fromOffset(math.clamp(viewport.X-36,1,360),250)
+        restore.Position=UDim2.fromOffset(14,math.clamp(viewport.Y*0.18,12,100))
+        if nextCompact~=compact then sidebar.CanvasPosition=Vector2.new(0,0) end
+        if nextCompact~=compact or width~=nextWidth or height~=nextHeight then
+            compact,width,height=nextCompact,nextWidth,nextHeight
+            layoutWindow()
+        end
+        clampPosition()
+    end
+    connect(gui:GetPropertyChangedSignal("AbsoluteSize"),fit)
+    function window:SetScale(value)
+        if not finite(value) or value<=0 then return false end
+        self._scale=value
+        fit()
+        return true
+    end
+    function window:ResetPosition()
+        root.Position=UDim2.fromScale(0.5,0.5)
+        fit()
+    end
+    layoutWindow()
+    fit()
     local function refreshSearch()
         for _,tab in ipairs(window.Tabs) do
             local count=0
@@ -338,10 +449,12 @@ function Library:CreateWindow(options)
     function window:CreateTab(name,iconName)
         if type(name)=="table" then iconName=name.Icon; name=name.Name end
         local tab={Name=name or "Tab",_order=0,_elements={},_sections={}}
+        local labelWidth=TextService:GetTextSize(tostring(tab.Name),15,measureFont,Vector2.new(200,100)).X
+        tab._navWidth=math.clamp(math.ceil(labelWidth)+57,104,200)
         table.insert(self.Tabs,tab); tabCount.Text=tostring(#self.Tabs).." tabs"
         local nav=button(sidebar,{Name=tab.Name,LayoutOrder=#self.Tabs,Size=UDim2.new(1,-2,0,36),BackgroundColor3=C.Row,BackgroundTransparency=0})
         corner(nav,8); local navStroke=stroke(nav,C.Accent,1)
-        local navIcon=icon(nav,iconName or "list",C.Muted); navIcon.Position=UDim2.fromOffset(12,7)
+        local navIcon=icon(nav,iconName or "list",C.Muted)
         local navText=text(nav,tab.Name,15,C.Muted,{Position=UDim2.fromOffset(45,0),Size=UDim2.new(1,-54,1,0),Font=Enum.Font.GothamMedium})
         local indicator=new("Frame",{Position=UDim2.new(0,0,0.5,-8),Size=UDim2.fromOffset(3,16),BackgroundColor3=C.Accent,BorderSizePixel=0,Visible=false},nav)
         corner(indicator,2)
@@ -371,8 +484,10 @@ function Library:CreateWindow(options)
                 end
             end
             refreshSearch()
+            revealTab()
         end
         tab._navStroke,tab._icon=navStroke,navIcon
+        layoutTab(tab)
         connect(nav.Activated,function() tab:Select() end)
         connect(nav.MouseEnter,function() if window.SelectedTab~=tab then animate(nav,{BackgroundColor3=C.Hover}) end end)
         connect(nav.MouseLeave,function() if window.SelectedTab~=tab then animate(nav,{BackgroundColor3=C.Row}) end end)
@@ -387,20 +502,33 @@ function Library:CreateWindow(options)
             register(obj,opts,value)
             if different and not silent then call(opts.Callback,value) end
         end
-        local function row(opts,reserve,height)
+        local function row(opts,reserve,canStack)
             local obj={_name=tostring(opts.Name or "Element"),_description=tostring(opts.Description or ""),_visible=true,_disabled=opts.Disabled==true,Flag=opts.Flag,_section=tab._section,_tab=tab}
-            local labelWidth=math.max(80,ROW_WIDTH-(reserve or 90)-28)
-            local descHeight=obj._description~="" and measure(obj._description,labelWidth,12) or 0
-            obj._height=height or (descHeight>0 and math.max(STYLE.DescriptionHeight,29+descHeight+10) or STYLE.RowHeight)
-            local r=new("Frame",{Name=obj._name,Size=UDim2.new(1,0,0,obj._height),BackgroundColor3=C.Row,BorderSizePixel=0},page)
+            local r=new("Frame",{Name=obj._name,BackgroundColor3=C.Row,BorderSizePixel=0},page)
             corner(r,STYLE.CardRadius); local border=stroke(r,C.Border,1); order(r)
-            local title=text(r,obj._name,STYLE.ControlFont,C.Text,{Position=UDim2.fromOffset(14,descHeight>0 and 7 or 0),Size=UDim2.new(1,-(reserve or 90)-14,descHeight>0 and 0 or 1,descHeight>0 and 19 or 0),Font=Enum.Font.GothamMedium})
-            local desc
-            if descHeight>0 then desc=text(r,obj._description,12,C.Muted,{Position=UDim2.fromOffset(14,29),Size=UDim2.new(1,-(reserve or 90)-14,0,descHeight),TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top,TextTruncate=Enum.TextTruncate.None}) end
+            local title=text(r,obj._name,STYLE.ControlFont,C.Text,{Font=Enum.Font.GothamMedium})
+            local desc=text(r,obj._description,STYLE.DescriptionFont,C.Muted,{TextWrapped=true,TextYAlignment=Enum.TextYAlignment.Top,TextTruncate=Enum.TextTruncate.None})
             obj.Frame,obj._title,obj._desc=r,title,desc
+            function obj:_layout()
+                self._stacked=canStack and compact and rowWidth<500
+                local padding=14+(self._stacked and 14 or reserve)
+                local hasDescription=self._description~=""
+                local minHeight=compact and 46 or STYLE.RowHeight
+                local descHeight=hasDescription and measure(self._description,rowWidth-padding,STYLE.DescriptionFont) or 0
+                local textHeight=hasDescription and math.max(STYLE.DescriptionHeight,29+descHeight+10) or minHeight
+                self._height=textHeight+(self._stacked and COMPACT.FieldHeight+8 or 0)
+                local fixedTitle=hasDescription or self._stacked
+                title.Position=UDim2.fromOffset(14,fixedTitle and 8 or 0)
+                title.Size=UDim2.new(1,-padding,fixedTitle and 0 or 1,fixedTitle and 19 or 0)
+                desc.Visible=hasDescription
+                desc.Position=UDim2.fromOffset(14,29)
+                desc.Size=UDim2.new(1,-padding,0,descHeight)
+                r.Size=UDim2.new(1,0,0,self._height)
+                if self._afterLayout then self:_afterLayout() end
+            end
             local function repaint()
                 animate(title,{TextColor3=obj._disabled and C.Dim or C.Text})
-                if desc then animate(desc,{TextColor3=obj._disabled and C.Dim or C.Muted}) end
+                animate(desc,{TextColor3=obj._disabled and C.Dim or C.Muted})
                 if obj._paint then obj:_paint() end
             end
             function obj:SetDisabled(value)
@@ -425,12 +553,19 @@ function Library:CreateWindow(options)
             connect(r.MouseEnter,function() if not obj._disabled then animate(r,{BackgroundColor3=C.Hover}); animate(border,{Transparency=0.65}) end end)
             connect(r.MouseLeave,function() animate(r,{BackgroundColor3=C.Row}); animate(border,{Transparency=1}) end)
             table.insert(tab._elements,obj); table.insert(window._controls,obj)
+            obj:_layout()
             obj:SetDisabled(obj._disabled); refreshSearch()
             return obj
         end
         local function field(parent,width,height,y)
             local f=new("Frame",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-12,0,y),Size=UDim2.fromOffset(width,height or STYLE.FieldHeight),BackgroundColor3=C.Field,BorderSizePixel=0},parent)
             corner(f,6); return f,stroke(f,C.Border,1)
+        end
+        local function layoutField(obj,holder,width,desktopHeight,compactHeight)
+            local h=compact and compactHeight or desktopHeight
+            local y=obj._stacked and obj._height-8-h/2 or obj._height/2
+            holder.Position=UDim2.new(1,-12,0,y)
+            holder.Size=UDim2.new(obj._stacked and 1 or 0,obj._stacked and -24 or width,0,h)
         end
         function tab:CreateSection(name)
             local section={_name=tostring(name),_visible=true}
@@ -442,22 +577,14 @@ function Library:CreateWindow(options)
             tab._section=section; table.insert(tab._sections,section); refreshSearch(); return section
         end
         function tab:CreateParagraph(opts)
-            local bodyText=tostring(opts.Content or "")
-            local obj=row({Name=opts.Title or opts.Name or "Paragraph",Description=bodyText},0)
-            local function layout()
-                obj._title.Position=UDim2.fromOffset(14,12); obj._title.Size=UDim2.new(1,-28,0,20)
-                if not obj._body then obj._body=obj._desc or text(obj.Frame,"",12,C.Muted) end
-                obj._body.Text=bodyText; obj._body.TextWrapped=true; obj._body.TextTruncate=Enum.TextTruncate.None
-                obj._body.TextYAlignment=Enum.TextYAlignment.Top; obj._body.Position=UDim2.fromOffset(14,37)
-                local h=measure(bodyText,ROW_WIDTH-28,12)
-                obj._body.Size=UDim2.new(1,-28,0,h); obj.Frame.Size=UDim2.new(1,0,0,h+51)
-            end
+            local obj=row({Name=opts.Title or opts.Name or "Paragraph",Description=opts.Content},14)
             function obj:Set(value)
                 if value.Title~=nil then self._name=tostring(value.Title); self._title.Text=self._name end
-                if value.Content~=nil then bodyText=tostring(value.Content); self._description=bodyText end
-                layout(); refreshSearch()
+                if value.Content~=nil then self._description=tostring(value.Content); self._desc.Text=self._description end
+                self:_layout()
+                refreshSearch()
             end
-            layout(); return obj
+            return obj
         end
         function tab:CreateButton(opts)
             local obj=row(opts,46)
@@ -475,7 +602,8 @@ function Library:CreateWindow(options)
             local knob=new("Frame",{Name="Knob",Position=UDim2.fromOffset(4,4),Size=UDim2.fromOffset(19,19),BackgroundColor3=C.Inactive,BorderSizePixel=0},track); corner(knob,20)
             local hit=button(obj.Frame,{Name="Activate",Size=UDim2.fromScale(1,1)}); obj._hit=hit
             function obj:_paint()
-                animate(track,{BackgroundColor3=C.Field})
+                local active=self.Value and not self._disabled
+                animate(track,{BackgroundColor3=active and C.Field:Lerp(C.Accent,0.22) or C.Field})
                 animate(knob,{Position=UDim2.fromOffset(self.Value and 30 or 4,4),BackgroundColor3=self._disabled and C.Dim or (self.Value and C.Accent or C.Inactive)})
             end
             function obj:Set(value,silent) changed(self,opts,value==true,silent); if not window._destroyed then self:_paint() end end
@@ -489,8 +617,6 @@ function Library:CreateWindow(options)
             assert(finite(step) and step>0,"Slider Increment must be a positive finite number")
             assert(opts.CurrentValue==nil or finite(opts.CurrentValue),"Slider CurrentValue must be finite")
             local obj=row(opts,100)
-            obj.Frame.Size=UDim2.new(1,0,0,obj._height+23)
-            obj._title.Position=UDim2.fromOffset(14,11); obj._title.Size=UDim2.new(1,-114,0,19)
             local valueField,valueStroke=field(obj.Frame,78,27,23)
             local box=new("TextBox",{Name="Value",Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",TextColor3=C.Text,TextSize=12,Font=Enum.Font.GothamMedium,ClearTextOnFocus=false},valueField)
             local track=new("Frame",{Name="Track",Position=UDim2.new(0,16,1,-18),Size=UDim2.new(1,-32,0,4),BackgroundColor3=C.Field,BorderSizePixel=0},obj.Frame); corner(track,4)
@@ -498,6 +624,18 @@ function Library:CreateWindow(options)
             local knob=new("Frame",{Name="Knob",AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(10,10),Position=UDim2.fromScale(0,0.5),BackgroundColor3=C.Text,BorderSizePixel=0},track); corner(knob,12)
             local hit=button(obj.Frame,{Name="SliderHit",Position=UDim2.new(0,6,1,-31),Size=UDim2.new(1,-12,0,29)})
             obj._track,obj._knob,obj._box,obj._hit=track,knob,box,hit
+            function obj:_afterLayout()
+                local hitHeight=compact and 44 or 32
+                self.Frame.Size=UDim2.new(1,0,0,self._height+hitHeight-5)
+                self._title.Position=UDim2.fromOffset(14,self._description=="" and 11 or 8)
+                self._title.Size=UDim2.new(1,-114,0,19)
+                valueField.Size=UDim2.fromOffset(78,compact and 34 or 27)
+                track.Position=UDim2.new(0,16,1,-math.floor(hitHeight/2)-2)
+                track.Size=UDim2.new(1,-32,0,compact and 6 or 4)
+                hit.Position=UDim2.new(0,6,1,-hitHeight)
+                hit.Size=UDim2.new(1,-12,0,hitHeight)
+            end
+            obj:_afterLayout()
             local function display() box.Text=tostring(obj.Value or low)..(opts.Suffix or "") end
             function obj:_paint()
                 box.TextEditable=not self._disabled
@@ -528,8 +666,7 @@ function Library:CreateWindow(options)
             connect(hit.MouseEnter,function() if obj:_canUse() then animate(knob,{Size=UDim2.fromOffset(13,13)}) end end)
             connect(hit.MouseLeave,function() if not window._drag then animate(knob,{Size=UDim2.fromOffset(10,10)}) end end)
             connect(hit.InputBegan,function(input)
-                if not obj:_canUse() then return end
-                if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
+                if not obj:_canUse() or window._drag or not pointerBegan(input) then return end
                 cancelInteraction()
                 local function update(position)
                     if obj:_canUse() and track.AbsoluteSize.X>0 then obj:Set(low+math.clamp((position.X-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)*(high-low)) end
@@ -542,21 +679,20 @@ function Library:CreateWindow(options)
             obj:Set(opts.CurrentValue or low,true); obj:_paint(); return obj
         end
         function tab:CreateDropdown(opts)
-            local obj=row(opts,STYLE.FieldWidth+54)
+            local obj=row(opts,STYLE.FieldWidth+24,true)
             obj.Frame.ClipsDescendants=true
             obj._optionConnections={}
-            local baseHeight=obj._height
-            local selectedField,selectedStroke=field(obj.Frame,STYLE.FieldWidth,STYLE.FieldHeight,baseHeight/2)
-            local selectedText=text(selectedField,"Select...",14,C.Text,{Position=UDim2.fromOffset(10,0),Size=UDim2.new(1,-20,1,0),TextXAlignment=Enum.TextXAlignment.Center,Font=Enum.Font.GothamBold})
-            local arrow=chevron(selectedField,C.Muted); arrow.Position=UDim2.new(0,-28,0.5,-8)
-            local hit=button(obj.Frame,{Name="DropdownHit",Size=UDim2.new(1,0,0,baseHeight)})
+            local selectedField,selectedStroke=field(obj.Frame,STYLE.FieldWidth,STYLE.FieldHeight,obj._height/2)
+            local selectedText=text(selectedField,"Select...",14,C.Text,{Position=UDim2.fromOffset(10,0),Size=UDim2.new(1,-38,1,0),Font=Enum.Font.GothamMedium})
+            local arrow=chevron(selectedField,C.Muted); arrow.Position=UDim2.new(1,-24,0.5,-8)
+            local hit=button(obj.Frame,{Name="DropdownHit"})
             obj._hit=hit
-            local queryBox=new("TextBox",{Name="OptionSearch",Position=UDim2.fromOffset(10,baseHeight+4),Size=UDim2.new(1,-20,0,30),BackgroundColor3=C.Field,BorderSizePixel=0,
+            local queryBox=new("TextBox",{Name="OptionSearch",BackgroundColor3=C.Field,BorderSizePixel=0,
                 Text="",PlaceholderText="Find an option...",PlaceholderColor3=C.Dim,TextColor3=C.Text,TextSize=12,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left,ClearTextOnFocus=false,Visible=false},obj.Frame)
             corner(queryBox,6); new("UIPadding",{PaddingLeft=UDim.new(0,10)},queryBox)
-            local list=new("ScrollingFrame",{Name="Options",Position=UDim2.fromOffset(10,baseHeight+4),Size=UDim2.new(1,-20,0,0),BackgroundTransparency=1,BorderSizePixel=0,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=2,ScrollBarImageColor3=C.Accent,Visible=false},obj.Frame)
+            local list=new("ScrollingFrame",{Name="Options",BackgroundTransparency=1,BorderSizePixel=0,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=2,ScrollBarImageColor3=C.Accent,Visible=false},obj.Frame)
             new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder},list)
-            local noOptions=text(obj.Frame,"No matching options",12,C.Muted,{Position=UDim2.fromOffset(18,baseHeight+43),Size=UDim2.new(1,-36,0,30),Visible=false})
+            local noOptions=text(obj.Frame,"No matching options",12,C.Muted,{Size=UDim2.new(1,-36,0,30),Visible=false})
             local values,items={},{}
             local open=false
             local function layoutOptions()
@@ -566,12 +702,24 @@ function Library:CreateWindow(options)
                     if item.Button.Visible then count=count+1 end
                 end
                 local searchable=#values>6
-                local top=baseHeight+(searchable and 40 or 4)
-                local listHeight=math.max(1,math.min(count,4))*34
+                local searchHeight=compact and COMPACT.FieldHeight or 30
+                local itemHeight=compact and 40 or 30
+                local top=obj._height+(searchable and searchHeight+10 or 4)
+                local listHeight=math.max(1,math.min(count,4))*(itemHeight+4)
+                queryBox.Position=UDim2.fromOffset(10,obj._height+4)
+                queryBox.Size=UDim2.new(1,-20,0,searchHeight)
                 queryBox.Visible=open and searchable; list.Visible=open and count>0
                 list.Position=UDim2.fromOffset(10,top); list.Size=UDim2.new(1,-20,0,listHeight)
                 noOptions.Position=UDim2.fromOffset(18,top); noOptions.Visible=open and count==0
-                obj.Frame.Size=UDim2.new(1,0,0,open and top+listHeight+10 or baseHeight)
+                obj.Frame.Size=UDim2.new(1,0,0,open and top+listHeight+10 or obj._height)
+            end
+            function obj:_afterLayout()
+                layoutField(self,selectedField,STYLE.FieldWidth,STYLE.FieldHeight,COMPACT.FieldHeight)
+                hit.Size=UDim2.new(1,0,0,self._height)
+                for _,item in ipairs(items) do
+                    item.Button.Size=UDim2.new(1,-5,0,compact and 40 or 30)
+                end
+                layoutOptions()
             end
             function obj:_paint()
                 selectedText.TextColor3=self._disabled and C.Dim or C.Text
@@ -609,7 +757,7 @@ function Library:CreateWindow(options)
                 values={}; items={}
                 for _,value in ipairs(newValues) do table.insert(values,value) end
                 for index,value in ipairs(values) do
-                    local item=button(list,{Name="Option",LayoutOrder=index,Size=UDim2.new(1,-5,0,30),BackgroundTransparency=0,BackgroundColor3=C.Field})
+                    local item=button(list,{Name="Option",LayoutOrder=index,Size=UDim2.new(1,-5,0,compact and 40 or 30),BackgroundTransparency=0,BackgroundColor3=C.Field})
                     corner(item,6)
                     local label=text(item,tostring(value),12,C.Text,{Position=UDim2.fromOffset(11,0),Size=UDim2.new(1,-42,1,0)})
                     local mark=new("Frame",{Position=UDim2.new(1,-25,0.5,-6),Size=UDim2.fromOffset(14,14),BackgroundTransparency=1,Visible=false},item)
@@ -627,16 +775,21 @@ function Library:CreateWindow(options)
             end
             connect(hit.Activated,function() if obj:_canUse() then obj:_expand(not open) end end)
             connect(queryBox:GetPropertyChangedSignal("Text"),layoutOptions)
+            obj:_afterLayout()
             obj:Refresh(opts.Options or {})
             if opts.CurrentOption~=nil then obj:Set(opts.CurrentOption,true) end
             return obj
         end
         function tab:CreateInput(opts)
-            local obj=row(opts,STYLE.FieldWidth+24)
+            local obj=row(opts,STYLE.FieldWidth+24,true)
             local holder,border=field(obj.Frame,STYLE.FieldWidth,STYLE.FieldHeight,obj._height/2)
             local box=new("TextBox",{Name="Input",Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text=tostring(opts.CurrentValue or ""),PlaceholderText=opts.PlaceholderText or "Type here...",PlaceholderColor3=C.Dim,TextColor3=C.Text,Font=Enum.Font.GothamBold,TextSize=14,TextXAlignment=Enum.TextXAlignment.Left,ClearTextOnFocus=false},holder)
             new("UIPadding",{PaddingLeft=UDim.new(0,10),PaddingRight=UDim.new(0,10)},box)
             obj._box=box
+            function obj:_afterLayout()
+                layoutField(self,holder,STYLE.FieldWidth,STYLE.FieldHeight,COMPACT.FieldHeight)
+            end
+            obj:_afterLayout()
             function obj:_paint() box.TextEditable=not self._disabled; box.TextColor3=self._disabled and C.Dim or C.Text end
             function obj:Set(value,silent) box.Text=tostring(value); changed(self,opts,box.Text,silent) end
             connect(box.Focused,function()
@@ -650,10 +803,14 @@ function Library:CreateWindow(options)
             register(obj,opts,box.Text); obj:_paint(); return obj
         end
         function tab:CreateKeybind(opts)
-            local obj=row(opts,157)
+            local obj=row(opts,157,true)
             local holder,border=field(obj.Frame,132,30,obj._height/2)
             local hit=button(holder,{Name="Keybind",Size=UDim2.fromScale(1,1),TextColor3=C.Text,TextSize=11,Font=Enum.Font.GothamMedium})
             obj._hit=hit
+            function obj:_afterLayout()
+                layoutField(self,holder,132,30,COMPACT.FieldHeight)
+            end
+            obj:_afterLayout()
             function obj:_paint() hit.TextColor3=self._disabled and C.Dim or C.Text end
             function obj:_cancelCapture()
                 if window._listening==self then window._listening=nil end
@@ -679,7 +836,7 @@ function Library:CreateWindow(options)
     end
     -- One input router for all controls, regardless of their count.
     connect(header.InputBegan,function(input)
-        if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
+        if window._drag or not pointerBegan(input) then return end
         cancelInteraction()
         local start=input.Position; local origin=root.Position; local size=gui.AbsoluteSize
         local x,y=origin.X.Scale*size.X+origin.X.Offset,origin.Y.Scale*size.Y+origin.Y.Offset
@@ -689,7 +846,11 @@ function Library:CreateWindow(options)
     end)
     connect(UIS.InputChanged,function(input)
         local drag=window._drag
-        if drag and root.Visible and (input.UserInputType==Enum.UserInputType.MouseMovement or input==drag.Input) then drag.Update(input.Position) end
+        if not drag or not root.Visible then return end
+        local mouseDrag=drag.Input.UserInputType==Enum.UserInputType.MouseButton1
+        if (mouseDrag and input.UserInputType==Enum.UserInputType.MouseMovement) or input==drag.Input then
+            drag.Update(input.Position)
+        end
     end)
     connect(UIS.InputEnded,function(input)
         local drag=window._drag
@@ -712,7 +873,7 @@ function Library:CreateWindow(options)
             if focused and focused:IsDescendantOf(gui) then focused:ReleaseFocus(false) end
             return
         end
-        if window._openDropdown and (input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch) then
+        if window._openDropdown and pointerBegan(input) then
             local frame=window._openDropdown.Frame
             local pos,size=frame.AbsolutePosition,frame.AbsoluteSize
             local point=input.Position
@@ -738,7 +899,7 @@ end)()
 -- Minimal starter. The generated Demo.client.lua includes the library.
 local Window = Library:CreateWindow({
     Name = "0xseanlee UI",
-    Subtitle = "v0.3.1",
+    Subtitle = "v0.4.0",
     Scale = 1,
     ToggleKey = Enum.KeyCode.RightShift,
 })

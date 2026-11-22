@@ -2,11 +2,13 @@
 
 Roblox Lua UI 函式庫，提供深色面板、藍紫色強調色、分頁、開關、滑桿、下拉選單、輸入框和快捷鍵。透過設定表建立元件，使用自己的 Callback 接上功能。
 
-目前版本：**v0.3.1**。本版已移除預設展示分頁與範例元件，文件中的元件範例可依需要自行加入。介面與事件處理由本函式庫實作；沒有內建遊戲自動化功能、遙測或第三方 Logo。
+目前版本：**v0.4.0**。桌面使用側欄，窄螢幕和可用高度較低的視窗會改成橫向分頁，避免將整個桌面介面縮成小字。手機版也加大了滑桿觸控區，並讓窄欄位移到標題下方。
 
 ## 1. 載入空白 UI
 
-在支援 `game:HttpGet` 和 `loadstring` 的 Lua 執行環境中執行：
+v0.4.0 可直接使用隨附的 [Demo.client.lua](Demo.client.lua)，或在 Roblox Studio 中按照第 6 節使用本機的 [Library.lua](Library.lua)。
+
+下列範例載入 GitHub 的 `main`：
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/main/Demo.client.lua"))()
@@ -17,16 +19,17 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/0xseanlee/0xseanlee-U
 操作：
 
 - 拖曳標題列移動視窗。
-- 右上角 `−` 收合，按浮動 `V` 按鈕或 `Right Shift` 還原。
+- 右上角 `−` 收合，按浮動 `0x` 按鈕或 `Right Shift` 還原。
 - `Right Shift` 隱藏／顯示，輸入文字時不觸發。
 - `×` 關閉並清理事件。重複執行會移除前一個視窗。
 - 右上方搜尋列可搜尋目前分頁的元件標題、說明與區塊名稱。
+- 小螢幕上可以左右滑動分頁列，內容區仍可上下捲動。
 - 滑桿可以拖曳，也可以點數值直接輸入。
 - 下拉選單超過六個選項會出現選項搜尋。Escape 或點選外部可收合。
 
 ## 2. 建立自己的 UI
 
-下面是最小完整範例，複製後即可使用：
+下面是最小完整範例。若使用本機版本，將第一行載入方式換成第 6 節的 `require`：
 
 ```lua
 local UI = loadstring(game:HttpGet(
@@ -56,11 +59,11 @@ Main:CreateButton({
 
 `Library.lua` 回傳函式庫 table；`CreateWindow` 回傳視窗，`CreateTab` 回傳分頁，各個 `Create...` 方法回傳可更新的元件物件。
 
-若要固定在目前版本、不跟隨 main 的更新，將網址中的 `/main/` 改成 `/v0.3.1/`：
+若要固定在v0.4.0，可用以下網址：
 
 ```lua
 local UI = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/v0.3.1/Library.lua"
+    "https://raw.githubusercontent.com/0xseanlee/0xseanlee-UI/v0.4.0/Library.lua"
 ))()
 ```
 

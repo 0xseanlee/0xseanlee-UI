@@ -344,6 +344,75 @@ input.InputBegan:Fire(keyboard("H"), false)
 check(otherKey.Value == Enum.KeyCode.J, "Hide cancels capture")
 window:SetVisible(true)
 check(input.InputBegan:Count() == 1 and input.InputChanged:Count() == 1 and input.InputEnded:Count() == 1, "One shared router per input signal")
+
+local function viewport(w, h)
+    window.Gui.AbsoluteSize = Vector2.new(w, h)
+    window.Gui:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+end
+
+local sidebar = rail:FindFirstChild("Sidebar")
+local scaler = window.Root:FindFirstChildOfClass("UIScale")
+local paragraph = second:CreateParagraph({
+    Title = "Responsive text",
+    Content = string.rep("The description must grow when space gets narrower. ", 8),
+})
+local desktopParagraphHeight = paragraph.Frame.Size.Y.Offset
+local toggleBeforeResize = toggle.Value
+for i = 1, 6 do window:CreateTab("More settings " .. i) end
+local last = window.Tabs[#window.Tabs]
+check(window:SetScale(1), "Restore default scale")
+window:ResetPosition()
+viewport(390, 844)
+check(scaler.Scale == 1 and window.Root.Size.X.Offset == 370, "Portrait layout reflows at full scale")
+check(window.Root.Position.X.Scale == 0.5 and window.Root.Position.Y.Scale == 0.5, "Resize preserves automatic centering")
+check(sidebar.ScrollingDirection == Enum.ScrollingDirection.X, "Portrait uses horizontal navigation")
+check(field._box.Parent.Size.X.Scale == 1 and field.Frame.Size.Y.Offset > 70, "Portrait stacks the input below its title")
+check(paragraph.Frame.Size.Y.Offset > desktopParagraphHeight, "Paragraph wraps to fit portrait width")
+check(slider._hit.Size.Y.Offset >= 44, "Compact slider has a larger touch target")
+last:Select()
+check(sidebar.CanvasPosition.X > 0 and last._page.Visible, "Offscreen selected tab is revealed")
+second:Select()
+check(not last._page.Visible and toggle.Value == toggleBeforeResize, "Responsive tab changes keep existing state")
+
+selected:Refresh({"one", "two", "three", "four", "five", "six", "seven"})
+selected._hit.Activated:Fire()
+local optionSearch = selected.Frame:FindFirstChild("OptionSearch")
+local optionList = selected.Frame:FindFirstChild("Options")
+check(optionSearch.Visible and optionList.Visible, "Compact dropdown exposes search and options")
+local portraitDropdownHeight = selected.Frame.Size.Y.Offset
+optionSearch:CaptureFocus()
+viewport(844, 390)
+check(scaler.Scale == 1 and window.Root.Size.Y.Offset == 370, "Landscape uses available height at full scale")
+check(sidebar.ScrollingDirection == Enum.ScrollingDirection.X and field._box.Parent.Size.X.Scale == 0, "Wide compact layout restores inline fields")
+check(optionSearch.Visible and selected.Frame.Size.Y.Offset < portraitDropdownHeight, "Open dropdown reflows in place on rotation")
+check(input:GetFocusedTextBox() == optionSearch, "Reflow does not dismiss focused option search")
+selected._hit.Activated:Fire()
+check(input:GetFocusedTextBox() == nil, "Closing a dropdown releases its option search")
+
+viewport(390, 844)
+local activeTouch = {UserInputType = Enum.UserInputType.Touch, Position = Vector3.new(100, 100, 0)}
+local otherTouch = {UserInputType = Enum.UserInputType.Touch, Position = Vector3.new(300, 100, 0)}
+slider._hit.InputBegan:Fire(activeTouch)
+slider._hit.InputBegan:Fire(otherTouch)
+input.InputChanged:Fire(otherTouch)
+input.InputChanged:Fire({UserInputType = Enum.UserInputType.MouseMovement, Position = otherTouch.Position})
+input.InputEnded:Fire(otherTouch)
+check(slider.Value == 10 and window._drag.Input == activeTouch, "Other pointers cannot take ownership of a touch drag")
+activeTouch.Position = Vector3.new(300, 100, 0)
+input.InputChanged:Fire(activeTouch)
+check(slider.Value == 20, "Original touch still controls the slider")
+input.InputEnded:Fire(activeTouch)
+check(window._drag == nil and second._page.ScrollingEnabled == scrollingBefore, "Touch release restores scrolling")
+
+viewport(1280, 800)
+check(sidebar.ScrollingDirection == Enum.ScrollingDirection.Y, "Desktop navigation is restored")
+check(field._box.Parent.Size.X.Offset == 225 and paragraph.Frame.Size.Y.Offset == desktopParagraphHeight, "Desktop field width and wrapping are restored")
+window.Root:FindFirstChild("Minimize").Activated:Fire()
+local restore = window.Gui:FindFirstChild("Restore")
+check(restore.Visible and not window.Root.Visible, "Minimize exposes the floating restore control")
+restore.Activated:Fire()
+check(window.Root.Visible and not restore.Visible, "Floating control restores the current window")
+
 -- Re-running should clean every tracked connection and destroy the prior hierarchy.
 local oldConnections, oldGui = window._connections, window.Gui
 local newLibrary = assert(loadfile(testDirectory .. "/Library.lua"))()
@@ -363,4 +432,4 @@ check(_G.__VELVET_UI_WINDOW.Tabs[1].Name == "Main", "Starter Main tab")
 check(#_G.__VELVET_UI_WINDOW._controls == 0, "Starter has no example controls")
 check(not _G.__VELVET_UI_WINDOW.Root:FindFirstChild("Content"):FindFirstChildOfClass("TextLabel").Visible, "Blank page has no search placeholder")
 _G.__VELVET_UI_WINDOW:Destroy()
-print("PASS: state, callbacks, tabs, numeric validation, refresh cleanup, hidden/focused input, control states, search, exclusive capture, re-run cleanup, standalone demo")
+print("PASS: state, callbacks, search, viewport reflow, touch ownership, dropdown resize, input routing, cleanup, blank demo")
